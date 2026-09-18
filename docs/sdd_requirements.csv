@@ -1,0 +1,245 @@
+ID,Category,Requirement,Description,Acceptance Criteria,Priority,Phase,Dependencies,Status
+REQ-001,Infrastructure - LLM Gateway,LiteLLM Proxy as model gateway,"LiteLLM Proxy runs as a standalone service (Docker container), routing all LLM requests. Ollama is the default upstream provider for local SLMs.","1. LiteLLM Proxy starts via docker-compose and exposes an OpenAI-compatible endpoint (e.g. http://litellm:4000).
+2. A virtual model alias ""default-agent"" resolves to qwen3.5:4b on Ollama.
+3. Switching to a cloud model (e.g. gpt-4o) requires only a config change in LiteLLM, no code change in the agent.
+4. LiteLLM tracks token usage, cost, and latency per request.
+5. Budget caps can be set per virtual key; requests exceeding the cap are rejected with a 429.",P0 - Must Have,Phase 1,Ollama installed and running,Not Started
+REQ-002,Infrastructure - LLM Gateway,Model aliasing and routing,"LiteLLM manages logical model profiles (e.g. default-agent, reasoning-large, reviewer) that map to physical model deployments.","1. At least 3 virtual aliases defined: default-agent, reasoning-large, reviewer.
+2. A single alias can map to multiple deployments (e.g. two Ollama instances of the same model for load balancing).
+3. If one deployment hits a quota or fails, LiteLLM falls back to the next deployment automatically.
+4. Alias-to-model mapping is stored in LiteLLM config, not application code.",P1 - Should Have,Phase 2,REQ-001,Not Started
+REQ-003,Infrastructure - LLM Gateway,Multi-deployment and failover for a single model,"LiteLLM can manage multiple physical deployments behind a single alias, supporting load distribution and automatic failover.","1. Two deployments of qwen3.5:4b can be registered under one alias.
+2. If deployment A returns 5xx or timeout, the request is retried on deployment B.
+3. Round-robin or least-latency routing is configurable.
+4. Failover events are logged to Langfuse.",P2 - Nice to Have,Phase 3,REQ-001; REQ-002,Not Started
+REQ-004,Infrastructure - Observability,Self-hosted Langfuse via Docker Compose,"Langfuse runs as a self-hosted service (docker-compose) with its own Postgres database, providing trace/span/generation UI and evaluation capabilities.","1. Langfuse is accessible at http://localhost:3000 after docker-compose up.
+2. Langfuse Postgres DB is separate from application Postgres.
+3. Agent traces appear in the Langfuse UI within 5 seconds of generation.
+4. Traces include: parent agent trace, child LLM generation spans, child tool-call spans, user_id, session_id, model name, token counts.",P0 - Must Have,Phase 1,None,Not Started
+REQ-005,Infrastructure - Observability,Structured agentic trace per call,"Each agentic call produces a hierarchical trace in Langfuse: agent-trace → planning-span → tool-call-spans → llm-generation-spans → final-answer-span.","1. Parent trace carries: user_id, session_id, input query, final output, total latency, total tokens, total cost.
+2. Each LLM generation span includes: model name, prompt tokens, completion tokens, latency, temperature.
+3. Each tool-call span includes: tool name, input args, output/error, latency.
+4. Traces are queryable by user, session, model, date, and tags.",P0 - Must Have,Phase 1,REQ-004,Not Started
+REQ-006,Infrastructure - Observability,LiteLLM → Langfuse integration,"LiteLLM Proxy is configured to emit generation-level telemetry to Langfuse, so every LLM call is traced automatically.","1. LiteLLM config includes Langfuse callback with LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, LANGFUSE_HOST.
+2. Every LLM call made through LiteLLM appears as a generation in Langfuse with model, tokens, cost, latency.
+3. LiteLLM-emitted generations are linked to the parent agent trace via trace_id passed in metadata.",P0 - Must Have,Phase 1,REQ-001; REQ-004,Not Started
+REQ-007,Evaluation,Benchmark dataset selection and ingestion,"A broad-scope Q&A benchmark dataset (TriviaQA subset or MMLU subset) is downloaded, cleaned, and loaded into a Langfuse Dataset for running experiments.","1. At least 200 Q&A pairs are loaded as Langfuse dataset items.
+2. Each item has: input (question string), expected_output (reference answer string), metadata (category, source).
+3. Dataset is version-tagged (e.g. v1.0).
+4. A Python script (scripts/load_benchmark.py) handles download and upload to Langfuse.
+5. Dataset is reproducible: running the script twice does not create duplicates.",P0 - Must Have,Phase 1,REQ-004,Not Started
+REQ-008,Evaluation,Automated evaluation experiment runner,"A Python script runs the agent against the benchmark dataset, collects generated answers, computes evaluation metrics, and records scored results back to Langfuse as an experiment.","1. Script (scripts/run_evaluation.py) iterates over all dataset items.
+2. For each item: calls the agent API, captures the generated answer, computes all metrics (REQ-009 through REQ-012), and writes scores to Langfuse.
+3. Experiment results appear in the Langfuse Datasets/Experiments UI with per-item scores.
+4. Script is idempotent: re-running creates a new experiment run, not duplicates.
+5. Supports configurable concurrency (e.g. --workers 4).",P0 - Must Have,Phase 1,REQ-007; REQ-013,Not Started
+REQ-009,Evaluation - Metric,Semantic similarity score,"Compute cosine similarity between sentence embeddings of expected and generated answers, yielding a 0.0-1.0 score.","1. Uses a local embedding model (e.g. all-MiniLM-L6-v2 via sentence-transformers or Ollama embeddings).
+2. Score is a float in [0.0, 1.0].
+3. Score is recorded per dataset item in Langfuse with key ""semantic_similarity"".
+4. Avg/min/max scores are reported in the experiment summary.",P0 - Must Have,Phase 1,REQ-008,Not Started
+REQ-010,Evaluation - Metric,Length comparison ratio,"Compute the ratio of generated answer length to expected answer length (in tokens or characters), yielding a ratio value.","1. Ratio = len(generated) / len(expected); values > 1.0 mean verbose, < 1.0 mean terse.
+2. Score recorded per item in Langfuse with key ""length_ratio"".
+3. Outlier flag: items with ratio < 0.3 or > 3.0 are tagged as outliers.
+4. Mean/median/stdev reported in experiment summary.",P0 - Must Have,Phase 1,REQ-008,Not Started
+REQ-011,Evaluation - Metric,LLM-as-Judge: Content Accuracy,"An LLM judge evaluates whether the generated answer is factually correct and covers the key points of the expected answer. Scores 1-5.","1. Judge receives a structured prompt with: question, expected answer, generated answer, and a rubric.
+2. Rubric: 1=completely wrong/irrelevant, 2=partially correct but major gaps, 3=mostly correct with minor errors, 4=correct with good coverage, 5=fully correct and comprehensive.
+3. Judge outputs a JSON with {""score"": int, ""reasoning"": str}.
+4. Score recorded per item in Langfuse with key ""judge_content_accuracy"".
+5. Judge uses the same LiteLLM gateway (but may use a different model alias, e.g. ""reviewer"").",P0 - Must Have,Phase 1,REQ-001; REQ-008,Not Started
+REQ-012,Evaluation - Metric,LLM-as-Judge: Form and Language,"An LLM judge evaluates clarity, structure, grammar, and appropriateness of language in the generated answer. Scores 1-5.","1. Judge receives a structured prompt with: question, generated answer, and a rubric.
+2. Rubric: 1=incoherent/unreadable, 2=poor structure or many grammar issues, 3=readable but awkward or poorly structured, 4=well-written with minor issues, 5=excellent clarity, structure, and language.
+3. Judge outputs {""score"": int, ""reasoning"": str}.
+4. Score recorded per item in Langfuse with key ""judge_form_language"".
+5. Judge call is traced in Langfuse as a child span of the evaluation trace.",P0 - Must Have,Phase 1,REQ-001; REQ-008,Not Started
+REQ-013,Evaluation - Metric,LLM-as-Judge: Completeness and Gaps,"An LLM judge evaluates whether the generated answer addresses all parts of the question without significant omissions. Scores 1-5.","1. Judge receives: question, expected answer, generated answer, and a rubric.
+2. Rubric: 1=misses the question entirely, 2=answers only a small fraction, 3=covers main point but omits significant sub-parts, 4=covers most aspects with minor gaps, 5=fully addresses all parts of the question.
+3. Judge outputs {""score"": int, ""reasoning"": str}.
+4. Score recorded per item in Langfuse with key ""judge_completeness"".
+5. Judge reasoning is stored for auditability.",P0 - Must Have,Phase 1,REQ-001; REQ-008,Not Started
+REQ-014,Infrastructure - Database,PostgreSQL for application data,"A PostgreSQL instance (Docker container) stores all application-level data: users, projects, conversations, messages, agent runs, tool calls, artifacts, model selections.","1. Postgres accessible at localhost:5432 in dev, named jo_harness_db.
+2. Schema managed via Alembic migrations.
+3. Tables include at minimum: users, sessions, conversations, messages, agent_runs, agent_events, tool_calls, artifacts, model_configs.
+4. All tables have created_at, updated_at timestamps.
+5. Foreign keys enforce referential integrity.",P0 - Must Have,Phase 2,None,Not Started
+REQ-015,Infrastructure - Database,pgvector for optional semantic memory,"PostgreSQL has pgvector extension enabled for storing and querying embeddings, used by agent memory and RAG.","1. pgvector extension is installed in the Postgres container.
+2. An embeddings table exists with: id, content, embedding (vector(384) or configurable), metadata (jsonb), created_at.
+3. Nearest-neighbor search (cosine similarity) returns results in <100ms for 100k rows.
+4. Embedding generation uses the same local model as REQ-009.",P2 - Nice to Have,Phase 3,REQ-014,Not Started
+REQ-016,Agent Core,OpenHands SDK as agent harness,"The agent uses OpenHands SDK for its core loop: event-driven step execution, action/observation model, tool dispatching, and workspace management.","1. openhands-sdk is a project dependency.
+2. Agent is instantiated via OpenHands Agent + Conversation + Workspace primitives.
+3. Agent can execute at least: file read/write, shell command, web fetch.
+4. Agent emits structured events (action requested, observation received, tool called, answer generated).
+5. Events are forwarded to the application's event bus for trace generation.",P0 - Must Have,Phase 2,REQ-001,Not Started
+REQ-017,Agent Core,AgentRuntime abstraction layer,"A thin Python interface (AgentRuntime) wraps OpenHands SDK so the rest of the application never imports OpenHands directly.","1. AgentRuntime protocol defines: create_session, run, steer, cancel, approve_tool_call, close_session (all async).
+2. OpenHandsRuntime implements AgentRuntime.
+3. FakeRuntime implements AgentRuntime for unit tests.
+4. Application services depend only on AgentRuntime, never on openhands.*.
+5. Swapping the runtime requires only a DI configuration change.",P0 - Must Have,Phase 2,REQ-016,Not Started
+REQ-018,Agent Core,Planning before execution,"The agent begins each task by generating an explicit plan (list of steps) before executing any tools. The plan is visible to the user and stored in the trace.","1. On receiving a user query, the agent first emits a ""plan"" event containing a structured list of intended steps.
+2. Plan is stored in the conversation history and Langfuse trace.
+3. Plan is streamed to the user before execution begins.
+4. Agent references the plan during execution and can revise it mid-task.
+5. If the model cannot produce a valid plan, the agent degrades gracefully to direct execution.",P0 - Must Have,Phase 2,REQ-016; REQ-017,Not Started
+REQ-019,Agent Core,Iterative tool/sub-agent orchestration,"At each turn of the agent loop, the agent decides whether to call a tool, delegate to a sub-agent, or conclude. A shared state object is updated at each step.","1. Agent loop supports: tool-call, sub-agent-delegation, direct-answer, and conclude actions.
+2. A shared state dict is maintained across loop iterations (accessible to the agent's context).
+3. Each iteration updates state with new observations.
+4. Agent evaluates at each turn whether it has sufficient information to answer.
+5. Loop has a configurable max-iterations safety limit (default: 15).",P0 - Must Have,Phase 2,REQ-016; REQ-017; REQ-018,Not Started
+REQ-020,Agent Core,Context compression,"Long-running sessions use context compression (rolling summaries or recursive summarization) to stay within the model's context window.","1. When accumulated context exceeds a configurable threshold (e.g. 80% of model context window), compression is triggered.
+2. Compression produces a condensed summary of prior turns while preserving: system prompt, tool definitions, current plan, and recent N turns.
+3. Compressed context is logged to Langfuse (pre/post token counts).
+4. Agent behavior remains coherent after compression (verified by evaluation suite).
+5. Compression strategy is configurable (rolling-summary, truncate-oldest, recursive).",P1 - Should Have,Phase 2,REQ-016; REQ-017,Not Started
+REQ-021,Agent Core,Streaming events to frontend,"All agent events (plan, tool calls, intermediate results, final answer) are streamed in real-time via SSE or WebSocket to reduce perceived latency.","1. FastAPI exposes an SSE endpoint (/api/v1/agent/stream/{session_id}).
+2. Events are typed JSON: {""type"": ""plan|tool_call|observation|delta|answer|error"", ""data"": {...}}.
+3. Text generation is streamed token-by-token (delta events).
+4. Frontend can display partial results as they arrive.
+5. Stream is resumable: client can reconnect and receive missed events from a cursor.",P0 - Must Have,Phase 2,REQ-016; REQ-033,Not Started
+REQ-022,Agent Core,Artifact generation and delivery,"The agent can produce structured artifacts (files, documents, code) and deliver them to the user via the API and frontend.","1. Agent can create artifacts: code files, markdown docs, PDF, DOCX, LaTeX-compiled documents.
+2. Artifacts are stored in Postgres (metadata) + filesystem or object storage (content).
+3. Each artifact has: id, name, mime_type, content_bytes, conversation_id, created_at.
+4. Artifacts are downloadable via GET /api/v1/artifacts/{id}.
+5. Frontend displays artifact previews inline and offers download.",P1 - Should Have,Phase 2,REQ-014; REQ-016; REQ-017,Not Started
+REQ-023,Tools - Core,File read and search,"Agent can read files from the workspace, search file contents (grep-like), and list directory structures.","1. Tools: read_file, search_files, list_directory.
+2. All operations are sandboxed to the agent's workspace root.
+3. search_files supports regex and glob patterns.
+4. File contents are returned with line numbers for reference.
+5. Operations on files >1MB are paginated or truncated.",P0 - Must Have,Phase 2,REQ-016,Not Started
+REQ-024,Tools - Core,File write and edit,"Agent can create new files and make targeted edits to existing files in the workspace.","1. Tools: write_file, edit_file (targeted string replacement).
+2. Edits are atomic: partial failures do not corrupt files.
+3. All writes are logged as tool-call events.
+4. write_file creates parent directories if needed.
+5. File writes respect workspace boundary (no escape to host filesystem).",P0 - Must Have,Phase 2,REQ-016,Not Started
+REQ-025,Tools - Core,Shell command execution,"Agent can execute shell commands in a controlled sandbox with configurable timeouts and output capture.","1. Tool: execute_shell with command, timeout, working_directory params.
+2. Stdout and stderr are captured and returned.
+3. Commands exceeding timeout are killed and an error observation is returned.
+4. Dangerous commands (rm -rf /, shutdown, etc.) are blocked by a deny-list policy.
+5. Exit code is included in the observation.",P0 - Must Have,Phase 2,REQ-016,Not Started
+REQ-026,Tools - Core,Web search and content retrieval,"Agent can search the web via self-hosted SearXNG and fetch/parse content from URLs for information gathering.","1. Tool: web_search with query, num_results params — calls SearXNG JSON API.
+2. Tool: fetch_url with url param, returns cleaned text content.
+3. web_search returns: title, snippet, URL for each result.
+4. fetch_url strips HTML and returns readable text (max 10k chars).
+5. Both tools respect a configurable URL allow/deny list.
+6. SearXNG is configured to aggregate results from Google, Bing, DuckDuckGo.",P1 - Should Have,Phase 2,REQ-016; REQ-049,Not Started
+REQ-027,Tools - Extended,Code execution sandbox,"Agent can write and execute Python/JavaScript code in an isolated sandbox, capturing output and errors.","1. Tool: execute_code with language, code, timeout params.
+2. Code runs in a disposable container (not the agent's main process).
+3. Stdout, stderr, and return value are captured.
+4. Execution has CPU and memory limits.
+5. Installed packages are configurable per workspace.",P1 - Should Have,Phase 3,REQ-016; REQ-025,Not Started
+REQ-028,Tools - Extended,Document generation (PDF/DOCX/LaTeX),"Agent can generate formatted documents in PDF, DOCX, and LaTeX-compiled PDF formats.","1. Tools: generate_pdf, generate_docx, compile_latex.
+2. generate_pdf accepts markdown or HTML input and produces a styled PDF.
+3. generate_docx produces a .docx from structured content.
+4. compile_latex compiles a .tex file to PDF (requires texlive in sandbox).
+5. Generated documents are stored as artifacts (REQ-022).",P2 - Nice to Have,Phase 3,REQ-022; REQ-027,Not Started
+REQ-029,Tools - Extended,RAG (Retrieval-Augmented Generation),"Agent can ingest documents into a vector store, then query it for relevant passages to augment its answers.","1. Tool: rag_ingest with file_path or text, collection_name params.
+2. Tool: rag_query with query, collection_name, top_k params.
+3. Documents are chunked, embedded (local model), and stored in pgvector.
+4. Queries return top-k passages with relevance scores.
+5. RAG tool calls are traced in Langfuse.",P1 - Should Have,Phase 3,REQ-015; REQ-016,Not Started
+REQ-030,Tools - Extended,Image interpretation,"Agent can analyze and describe images using a multimodal model.","1. Tool: analyze_image with image_path or base64 content.
+2. Uses a multimodal model via LiteLLM (e.g. gemma4-e4b or a cloud vision model).
+3. Returns a text description, detected objects, or answers to questions about the image.
+4. Image is included in the Langfuse trace as metadata.",P2 - Nice to Have,Phase 3,REQ-001; REQ-016,Not Started
+REQ-031,Tools - Extended,Email integration (Gmail connector),"Agent can read, search, and draft emails via Gmail API, subject to user authorization via Authentik-brokered Google OAuth.","1. Gmail connector uses OAuth2 brokered through Authentik (user links their Google account in Authentik).
+2. Tools: search_emails, read_email, draft_email.
+3. search_emails returns subject, sender, date, snippet for matching messages.
+4. read_email returns full body text.
+5. draft_email creates a draft in the user's Gmail (does not auto-send without approval).
+6. OAuth tokens are managed by Authentik and retrieved via its API.",P2 - Nice to Have,Phase 3,REQ-014; REQ-035; REQ-036,Not Started
+REQ-032,Interoperability - MCP,Agent tools exposed as MCP server,"The agent's tool catalog is also served as an MCP server, allowing external MCP-compatible clients (IDEs, other agents) to invoke them.","1. An MCP server (FastMCP or custom) exposes agent tools following the MCP 2026-07 spec.
+2. Tools are discoverable via the MCP tools/list endpoint.
+3. External clients can call tools via JSON-RPC over stdio or HTTP/SSE.
+4. Tool execution follows the same sandboxing and policy rules as internal calls.
+5. MCP server is optional and can be enabled/disabled via configuration.",P1 - Should Have,Phase 3,REQ-016,Not Started
+REQ-033,API Layer,FastAPI backend,"FastAPI serves as the product API layer, handling authentication, session management, agent orchestration, and streaming.","1. FastAPI app starts at http://localhost:8000 with /docs (Swagger) and /redoc.
+2. API versioned under /api/v1/.
+3. Endpoints include: auth, users, conversations, messages, agent (run/stream/cancel), artifacts, tools, health.
+4. All endpoints return consistent JSON response envelopes.
+5. Error responses follow RFC 7807 problem details format.",P0 - Must Have,Phase 2,REQ-014,Not Started
+REQ-034,Interoperability - A2A,Agent exposed via A2A protocol,"The agent advertises its capabilities via an A2A Agent Card and can receive tasks from external agents via A2A JSON-RPC over HTTP.","1. Agent Card (JSON) is served at /.well-known/agent.json with name, description, capabilities, and supported content types.
+2. The A2A endpoint accepts tasks/send and tasks/get requests (JSON-RPC 2.0).
+3. Task lifecycle follows A2A spec: submitted → working → completed/failed.
+4. Streaming updates are available via SSE on the task endpoint.
+5. A2A server can be enabled/disabled via configuration.",P1 - Should Have,Phase 3,REQ-033,Not Started
+REQ-035,Authentication,User registration and login via Authentik,"Users register and log in through Authentik (self-hosted OIDC/OAuth2 identity provider). Authentik handles email/password, password reset, and optional social logins (Google, GitHub). FastAPI validates Authentik-issued JWTs.","1. Authentik runs as a Docker Compose service (authentik-server + authentik-worker + Redis + its own Postgres or shared Postgres).
+2. Authentik provides login, registration, password reset, and account recovery flows via its built-in branded UI.
+3. FastAPI validates Authentik-issued JWTs using Authentik's JWKS endpoint.
+4. On first login, FastAPI creates/syncs a local user record in Postgres from the OIDC claims (sub, email, name, picture).
+5. Protected endpoints require a valid Bearer token issued by Authentik.
+6. JWT access tokens expire in 30 minutes; refresh tokens in 7 days (configured in Authentik).",P0 - Must Have,Phase 2,REQ-014,Not Started
+REQ-036,Authentication,SSO via Authentik (Google/GitHub social login),"Authentik is configured as an OIDC broker for social identity providers (Google, GitHub, etc.). Users can sign up and log in via social accounts without the application managing OAuth flows directly.","1. Authentik is configured with Google and/or GitHub as federated social login sources.
+2. Users see 'Sign in with Google' and 'Sign in with GitHub' buttons on the Authentik login page.
+3. On first social login, Authentik creates a user and FastAPI syncs it locally.
+4. Social-linked accounts are mergeable with email/password accounts sharing the same email.
+5. No Google Cloud OAuth credentials are needed in the application itself — Authentik holds them.",P1 - Should Have,Phase 2,REQ-035,Not Started
+REQ-037,Authentication,Per-user tracking in Langfuse,"Every agent call is tagged with the authenticated user's ID in Langfuse, enabling per-user usage analytics.","1. Langfuse traces include user_id matching the application's user ID.
+2. Langfuse dashboard can filter traces by user.
+3. LiteLLM virtual keys (if used) include user metadata for attribution.
+4. Cost and token usage can be aggregated per user in Langfuse.",P0 - Must Have,Phase 2,REQ-004; REQ-005; REQ-035,Not Started
+REQ-038,Frontend,Chainlit prototype UI,"A Chainlit-based chat UI is mounted within or alongside the FastAPI app, supporting streaming, tool-call visibility, and artifact display. Auth is delegated to Authentik.","1. Chainlit UI is accessible at http://localhost:8000/chat (or similar mount path).
+2. User messages are sent to the agent and responses are streamed back in real-time.
+3. Tool calls are displayed as expandable steps within the conversation.
+4. Artifacts are displayed inline or as downloadable links.
+5. Authentication is delegated to Authentik; Chainlit receives authenticated user context from FastAPI via header auth.",P0 - Must Have,Phase 2,REQ-033; REQ-035,Not Started
+REQ-039,Frontend,Production UI (customized Open WebUI or React),"For production, either customize Open WebUI (FastAPI-native, Ollama-integrated, built-in Pipes/Actions extensibility) or build a custom React UI if deeper control is needed. Both options consume the same FastAPI API.","1. Open WebUI is deployed alongside FastAPI and configured to proxy agent requests through our API.
+2. Open WebUI's Pipes/Actions system is used to wire in our agent tools and streaming.
+3. Chat interface supports streaming with typed event rendering.
+4. Workspace panel shows file tree and allows file inspection.
+5. Artifact panel displays previews (code, markdown, PDF, images) with download.
+6. Settings panel allows model selection from available aliases.
+7. Auth delegates to Authentik via OIDC.",P1 - Should Have,Phase 3,REQ-033; REQ-035,Not Started
+REQ-040,Infrastructure - DevOps,Docker Compose for local development,"A single docker-compose.yml brings up the entire development stack: FastAPI, Postgres, LiteLLM Proxy, Langfuse, Authentik, SearXNG, Redis, and Celery workers.","1. docker-compose up -d starts all services with no manual steps.
+2. .env.example documents all required environment variables.
+3. Postgres data is persisted via a named volume.
+4. Hot-reload is enabled for FastAPI (volume-mounted source code).
+5. docker-compose down -v cleanly tears down all containers and volumes.
+6. Services include: postgres, langfuse-db, langfuse, litellm, authentik-server, authentik-worker, redis, searxng, celery-worker.",P0 - Must Have,Phase 1,All infrastructure REQs,Not Started
+REQ-041,Infrastructure - DevOps,Kubernetes-ready containerization,"Each service (FastAPI, Postgres, LiteLLM, Langfuse) has a production Dockerfile and can be deployed to Kubernetes with Helm charts or manifests.","1. Dockerfiles use multi-stage builds with minimal final images.
+2. Services communicate via Kubernetes service DNS names.
+3. Secrets are injected via Kubernetes Secrets or external secret managers.
+4. Horizontal pod autoscaling is configured for FastAPI workers.
+5. Readiness and liveness probes are defined for each service.",P2 - Nice to Have,Phase 3,REQ-040,Not Started
+REQ-042,Agent Core,SLM model selection (qwen3.5:4b default),"The default local SLM is qwen3.5:4b running on Ollama, selected for its best-in-class tool calling and reasoning in the ~4B parameter class.","1. qwen3.5:4b is pulled and available via Ollama.
+2. LiteLLM alias ""default-agent"" routes to ollama/qwen3.5:4b.
+3. Agent system prompt is optimized for qwen3.5's tool-calling template.
+4. Model can be swapped by changing only the LiteLLM config (no code change).
+5. A MODELS.md doc lists tested models, their aliases, and known quirks.",P0 - Must Have,Phase 1,REQ-001,Not Started
+REQ-043,Tools - Extended,Sub-agent delegation,"The agent can spawn sub-agents for specialized tasks (e.g. research, code review, document drafting) that run independently and report back.","1. A delegation tool allows the agent to spawn a sub-agent with a specific task, tools subset, and model alias.
+2. Sub-agents run as separate conversations inheriting workspace context.
+3. Sub-agent results are returned to the parent agent as observations.
+4. Sub-agent traces are nested under the parent trace in Langfuse.
+5. Max concurrent sub-agents is configurable (default: 3).",P1 - Should Have,Phase 3,REQ-016; REQ-017; REQ-019,Not Started
+REQ-044,Tools - Extended,Extraction agent tools,"Agent can extract structured data from unstructured text, PDFs, and images into JSON or tabular format.","1. Tool: extract_structured with input (text/file path), schema (JSON schema), params.
+2. Extraction uses the LLM with structured output mode.
+3. Returns validated JSON conforming to the provided schema.
+4. Supports extracting from: plain text, markdown, PDF text, and OCR'd images.
+5. Extraction failures return partial results with error indicators.",P2 - Nice to Have,Phase 3,REQ-016; REQ-030,Not Started
+REQ-045,Tools - Extended,Study/research agent tools,"Agent can perform multi-step research: search the web, read papers/docs, synthesize findings into a structured report.","1. Compound tool/sub-agent: research_topic with query, depth, output_format params.
+2. Performs iterative web search → content retrieval → synthesis.
+3. Produces a structured markdown report with citations.
+4. Research depth is configurable (shallow: 3 sources, deep: 10+ sources).
+5. Final report is stored as an artifact.",P2 - Nice to Have,Phase 3,REQ-026; REQ-043,Not Started
+REQ-046,Infrastructure - Concurrency,Celery task queue for agent runs,"Agent runs are dispatched as Celery tasks via Redis broker, enabling concurrent multi-user agent execution and horizontal scaling.","1. Celery worker process runs alongside FastAPI.
+2. Redis serves as the Celery broker and result backend.
+3. Agent runs are submitted as Celery tasks from FastAPI endpoints.
+4. Multiple agent runs can execute concurrently (configurable worker concurrency).
+5. Task status is queryable via API (pending, running, completed, failed).
+6. SSE/WebSocket stream reads events from the Celery task in real-time.
+7. Worker count is independently scalable (docker-compose scale or K8s HPA).",P0 - Must Have,Phase 2,REQ-016; REQ-033,Not Started
+REQ-047,Evaluation,Tiered evaluation (fast smoke + full benchmark),"The evaluation suite supports two tiers: a fast smoke test (20 items, <2 min) for CI on every change, and a full benchmark (200 items) for pre-deployment or manual testing.","1. scripts/run_evaluation.py accepts --tier fast|full.
+2. Fast tier uses a 20-item subset tagged 'smoke' in the Langfuse dataset.
+3. Full tier uses the complete 200-item dataset.
+4. CI pipeline runs the fast tier on every push/PR.
+5. Full tier can be triggered manually via CLI or CI workflow dispatch.
+6. Both tiers produce experiment results in Langfuse with tier metadata.
+7. Fast tier completes in under 2 minutes with default concurrency.",P0 - Must Have,Phase 1,REQ-007; REQ-008,Not Started
+REQ-048,Authentication,User account management,"Authentik provides self-service user account management: password reset, profile editing, email verification, and session management.","1. Users can reset their password via Authentik's 'forgot password' flow (email link).
+2. Users can update their profile (name, avatar) via Authentik's user settings page.
+3. Users can view and revoke active sessions.
+4. Email verification is required on registration (configurable).
+5. FastAPI syncs profile changes from Authentik on token refresh.",P0 - Must Have,Phase 2,REQ-035,Not Started
+REQ-049,Infrastructure,SearXNG self-hosted meta-search,"A self-hosted SearXNG instance provides the agent with web search capabilities, aggregating results from Google, Bing, DuckDuckGo without requiring API keys.","1. SearXNG runs as a Docker Compose service.
+2. JSON API is accessible at http://searxng:8080/search?format=json.
+3. Search engines configured: Google, Bing, DuckDuckGo (via settings.yml).
+4. Rate limiting is configured to avoid upstream blocks.
+5. No external API keys required.",P1 - Should Have,Phase 2,REQ-040,Not Started
