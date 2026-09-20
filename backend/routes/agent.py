@@ -8,8 +8,11 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import uuid
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from fastapi.responses import StreamingResponse
@@ -32,10 +35,14 @@ pending_approvals: dict[str, asyncio.Event] = {}
 class RunRequest(BaseModel):
     task: str
     max_iterations: int = 10
+    conversation_id: str | None = None
 
 
 async def agent_task(
-    session_id: str, task: str, user_id: str = "anonymous_user"
+    session_id: str,
+    task: str,
+    user_id: str = "anonymous_user",
+    conversation_id: str | None = None,
 ) -> None:
     """Background task that simulates the agent run loop and streams events.
 
@@ -43,19 +50,85 @@ async def agent_task(
     call → approval gate → finish — using the caller-supplied *task* text so
     the output is contextually relevant in a demo.
     """
+    conversation_id = conversation_id or str(uuid.uuid4())
     policy_engine = PolicyEngine(workspace_root="/tmp/forge_workspace")
     runtime = OpenHandsRuntime(policy_engine=policy_engine)
 
     await runtime.init_session(session_id, user_id=user_id)
     seq = 0
 
+    # Sync with DB Conversation and Message history
+    conv_title = task[:60] + ("…" if len(task) > 60 else "")
+    prior_context = ""
+    try:
+        from backend.db.models import Conversation, Message
+        from backend.db.session import SessionLocal
+
+        with SessionLocal() as db:
+            conv = (
+                db.query(Conversation)
+                .filter(Conversation.id == conversation_id)
+                .first()
+            )
+            if not conv:
+                conv = Conversation(
+                    id=conversation_id,
+                    user_id=user_id,
+                    title=conv_title,
+                )
+                db.add(conv)
+                db.commit()
+            else:
+                conv_title = conv.title
+
+            # Check prior messages to support contextual follow-ups
+            prior_msgs = (
+                db.query(Message)
+                .filter(Message.conversation_id == conversation_id)
+                .order_by(Message.created_at.asc())
+                .all()
+            )
+            if prior_msgs:
+                recent = prior_msgs[-4:]
+                prior_context = " | ".join(
+                    f"{m.role}: {m.content[:100]}" for m in recent
+                )
+
+            # Record this user turn
+            user_msg = Message(
+                id=str(uuid.uuid4()),
+                conversation_id=conversation_id,
+                role="user",
+                content=task,
+            )
+            db.add(user_msg)
+            db.commit()
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("DB conversation sync skipped: %s", exc)
+
+    # Helper to emit SSE events with metadata
     async def emit(
-        event_type: str, content: str, tool_name: str | None = None
+        event_type: str,
+        content: str,
+        tool_name: str | None = None,
+        artifact_id: str | None = None,
+        artifact_name: str | None = None,
     ) -> AgentEvent:
         nonlocal seq
-        meta: dict[str, object] = {}
+        tokens_used = policy_engine.token_counts.get(session_id, 0)
+        meta: dict[str, object] = {
+            "conversation_id": conversation_id,
+            "tokens_used": tokens_used,
+            "cost_usd": round(tokens_used * 0.000002, 5),
+            "iterations": policy_engine.iteration_counts.get(session_id, 0),
+        }
         if tool_name:
             meta["tool_name"] = tool_name
+        if artifact_id:
+            meta["artifact_id"] = artifact_id
+            meta["artifact_name"] = artifact_name or "artifact"
+            meta["artifact_url"] = f"/api/v1/artifacts/{artifact_id}/download"
+
         event = AgentEvent(
             seq=seq, event_type=event_type, content=content, metadata=meta
         )
@@ -69,7 +142,30 @@ async def agent_task(
     # ── Step 1: planning thought ────────────────────────────────────────
     await asyncio.sleep(0.4)
 
-    task_lower = task.lower()
+    task_lower = task.lower().strip()
+    # Resolve search query with conversation context if this is a follow-up
+    effective_query = task
+    is_follow_up = bool(prior_context) and (
+        any(
+            task_lower.startswith(prefix)
+            for prefix in [
+                "and ",
+                "when ",
+                "who ",
+                "why ",
+                "where ",
+                "how ",
+                "tell me",
+                "what about",
+                "did ",
+                "was ",
+            ]
+        )
+        or len(task) < 35
+    )
+    if is_follow_up and conv_title:
+        effective_query = f"{conv_title} - {task}"
+
     if any(k in task_lower for k in ["pdf", "generate pdf", "export pdf"]):
         tool_name = "generate_pdf"
         tool_args = {
@@ -100,8 +196,15 @@ async def agent_task(
     else:
         # Default for informational, research, summarization, or general queries:
         tool_name = "research_topic"
-        tool_args = {"query": task, "depth": "shallow"}
-        plan_desc = "Identified research request. Will search authoritative sources via SearXNG, extract content, and synthesize structured report."
+        tool_args = {
+            "query": effective_query,
+            "depth": "shallow",
+            "conversation_id": conversation_id,
+        }
+        plan_desc = (
+            f"Identified research request. Will search authoritative sources for '{effective_query}' "
+            f"via SearXNG, extract content, and synthesize structured report."
+        )
 
     plan = (
         f"I need to complete the following task:\n\n"
@@ -116,20 +219,34 @@ async def agent_task(
     # ── Step 2: tool execution ──────────────────────────────────────────
     await asyncio.sleep(0.5)
 
+    captured_artifact_id: str | None = None
+    captured_artifact_name: str | None = None
+
     try:
         tool_res = await runtime.execute_tool(session_id, tool_name, tool_args)
 
         # Format rich output for presentation
         if isinstance(tool_res, dict) and "report" in tool_res:
             report_text = str(tool_res.get("report", ""))
-            artifact_name = tool_res.get("artifact_name", "")
+            captured_artifact_id = tool_res.get("artifact_id")
+            captured_artifact_name = tool_res.get("artifact_name")
             formatted_res = report_text
-            if artifact_name:
-                formatted_res += f"\n\n---\n📁 **Saved Artifact:** `{artifact_name}`"
-            await emit("tool_result", formatted_res, tool_name=tool_name)
+            if captured_artifact_name:
+                formatted_res += (
+                    f"\n\n---\n📁 **Saved Artifact:** `{captured_artifact_name}`"
+                )
+            await emit(
+                "tool_result",
+                formatted_res,
+                tool_name=tool_name,
+                artifact_id=captured_artifact_id,
+                artifact_name=captured_artifact_name,
+            )
         elif isinstance(tool_res, dict):
             await emit(
-                "tool_result", json.dumps(tool_res, indent=2), tool_name=tool_name
+                "tool_result",
+                json.dumps(tool_res, indent=2),
+                tool_name=tool_name,
             )
         else:
             await emit("tool_result", str(tool_res), tool_name=tool_name)
@@ -170,7 +287,29 @@ async def agent_task(
             "Summary: The agent processed your request and produced the output above. "
             "All policy checks passed."
         )
-    await emit("finish", finish_msg)
+    await emit(
+        "finish",
+        finish_msg,
+        artifact_id=captured_artifact_id,
+        artifact_name=captured_artifact_name,
+    )
+
+    # Save assistant message to conversation DB
+    try:
+        from backend.db.models import Message
+        from backend.db.session import SessionLocal
+
+        with SessionLocal() as db:
+            asst_msg = Message(
+                id=str(uuid.uuid4()),
+                conversation_id=conversation_id,
+                role="assistant",
+                content=finish_msg,
+            )
+            db.add(asst_msg)
+            db.commit()
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("DB assistant message sync skipped: %s", exc)
 
 
 @router.post("/run")
@@ -181,8 +320,15 @@ async def run_agent(
 ) -> dict[str, Any]:
     """Start an agent task and return the session ID for streaming."""
     session_id = str(uuid.uuid4())
-    background_tasks.add_task(agent_task, session_id, req.task, user_id)
-    return {"data": {"session_id": session_id}, "session_id": session_id}
+    conversation_id = req.conversation_id or str(uuid.uuid4())
+    background_tasks.add_task(
+        agent_task, session_id, req.task, user_id, conversation_id
+    )
+    return {
+        "data": {"session_id": session_id, "conversation_id": conversation_id},
+        "session_id": session_id,
+        "conversation_id": conversation_id,
+    }
 
 
 @router.post("/cancel/{session_id}")

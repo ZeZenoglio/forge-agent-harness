@@ -199,7 +199,7 @@ class OpenHandsRuntime(AgentRuntime):
             return research_topic(
                 query=arguments.get("query", ""),
                 depth=arguments.get("depth", "shallow"),
-                conversation_id=session_id,
+                conversation_id=arguments.get("conversation_id", session_id),
             )
         elif tool_name == "web_search":
             from backend.tools.web import web_search
