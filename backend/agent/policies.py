@@ -92,3 +92,28 @@ class PolicyEngine:
         # We can expand this list (e.g., deleting files, sending emails)
         if tool_name == "delete_file":
             raise ApprovalRequiredException(f"Deleting file requires human approval: {arguments.get('path')}")
+
+    def validate_citations(self, response: str, context: list[str]) -> bool:
+        """
+        Extract quotes from the LLM response and ensure they exist in the provided context.
+        Raises ValueError if a hallucinated quote is found.
+        """
+        import re
+        
+        # Simple extraction of double-quoted strings
+        quotes = re.findall(r'"([^"]+)"', response)
+        
+        # For a robust system, we would ignore small quotes (e.g., under 3 words).
+        # We will filter out small strings that might be natural language parts or code keywords.
+        significant_quotes = [q for q in quotes if len(q.split()) > 3]
+        
+        combined_context = " ".join(context)
+        
+        for quote in significant_quotes:
+            if quote not in combined_context:
+                # If exact match fails, try a normalized match (ignoring whitespace)
+                norm_quote = re.sub(r'\s+', ' ', quote).strip()
+                norm_context = re.sub(r'\s+', ' ', combined_context)
+                if norm_quote not in norm_context:
+                    raise ValueError(f"Hallucinated citation detected. Quote not found in context: '{quote}'")
+        return True

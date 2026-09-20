@@ -69,6 +69,12 @@ class OpenHandsRuntime(AgentRuntime):
                     task_description=arguments.get("task_description", ""),
                     model_alias=arguments.get("model_alias", "default-agent")
                 )
+            elif tool_name == "memorize":
+                from backend.tools.rag import memorize
+                return memorize(arguments.get("content", ""))
+            elif tool_name == "search_memory":
+                from backend.tools.rag import search_memory
+                return search_memory(arguments.get("query", ""))
             else:
                 return {"error": f"Unknown tool: {tool_name}"}
         except Exception as e:  # noqa: BLE001
