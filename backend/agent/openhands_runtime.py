@@ -75,6 +75,13 @@ class OpenHandsRuntime(AgentRuntime):
             elif tool_name == "search_memory":
                 from backend.tools.rag import search_memory
                 return search_memory(arguments.get("query", ""))
+            elif tool_name == "send_email":
+                from backend.tools.email import send_email
+                return send_email(
+                    to_address=arguments.get("to_address", ""),
+                    subject=arguments.get("subject", ""),
+                    body=arguments.get("body", "")
+                )
             else:
                 return {"error": f"Unknown tool: {tool_name}"}
         except Exception as e:  # noqa: BLE001
