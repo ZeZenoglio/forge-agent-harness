@@ -11,7 +11,7 @@
    ```
 2. **Start the API Server:**
    ```bash
-   uv run uvicorn backend.api.main:app --reload
+   uv run uvicorn backend.main:app --reload
    ```
 3. **Open Browser Tabs:**
    - Tab 1: `docs/architecture.html` (The Architecture Diagram)
