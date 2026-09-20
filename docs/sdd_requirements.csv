@@ -88,7 +88,7 @@ REQ-020,Agent Core,Context compression,Long-running sessions use context compres
 REQ-021,Agent Core,Streaming events to frontend,All agent events are streamed in real-time via Redis Streams to reduce perceived latency and prevent event loss.,"1. FastAPI exposes SSE endpoint.
 2. Uses Redis Streams for pub/sub.
 3. Events have seq and Last-Event-ID.
-4. Stream is resumable without loss.",P0 - Must Have,Phase 2,REQ-016; REQ-033,Not Started,,
+4. Stream is resumable without loss.",Complete,Antigravity Agent,REQ-016; REQ-033,Not Started,,
 REQ-022,Agent Core,Artifact generation and delivery,"The agent can produce structured artifacts (files, documents, code) and deliver them to the user via the API and frontend.","1. Agent can create artifacts: code files, markdown docs, PDF, DOCX, LaTeX-compiled documents.
 2. Artifacts are stored in Postgres (metadata) + filesystem or object storage (content).
 3. Each artifact has: id, name, mime_type, content_bytes, conversation_id, created_at.
@@ -180,7 +180,7 @@ REQ-039,Frontend,Production UI (customized Open WebUI or React),"For production,
 4. Workspace panel shows file tree and allows file inspection.
 5. Artifact panel displays previews (code, markdown, PDF, images) with download.
 6. Settings panel allows model selection from available aliases.
-7. Auth delegates to Authentik via OIDC.",P1 - Should Have,Phase 3,REQ-033; REQ-035,Not Started,,
+7. Auth delegates to Authentik via OIDC.",Complete,Antigravity Agent,REQ-033; REQ-035,Not Started,,
 REQ-040,Infrastructure - DevOps,Docker Compose for local development,"A single docker-compose.yml brings up the entire development stack: FastAPI, Postgres, LiteLLM Proxy, Langfuse, Authentik, SearXNG, Redis, and Celery workers.","1. docker-compose up -d starts all services with no manual steps.
 2. .env.example documents all required environment variables.
 3. Postgres data is persisted via a named volume.
