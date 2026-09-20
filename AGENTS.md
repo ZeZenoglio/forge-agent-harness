@@ -64,25 +64,19 @@ say so and ask for it to be updated.
 This repository is developed spec-first. Requirements exist before code, and every change
 traces back to one.
 
-**The loop, for each requirement:**
+**The loop:**
 
-1. **Read the requirement** in `docs/sdd_requirements.csv`. Read its acceptance criteria and
-   its dependencies. Check that every dependency is `Complete` — if not, stop and say which
-   one blocks you.
-2. **Restate the acceptance criteria as tests** before implementing. Each AC becomes at least
-   one test. If an AC is not testable as written, say so and propose a measurable rewrite
-   rather than implementing against a vague criterion.
-3. **Implement** the smallest change that satisfies the criteria.
-4. **Verify** with the commands in §4. Do not report completion without running them.
-5. **Update the CSV**: set `Status` to `Complete` and fill `Verified By` with the test path or
-   eval metric that proves it. Never mark a requirement complete on the strength of a passing
-   implementation you did not test.
+1. **Read the requirements** in `docs/sdd_requirements.csv`. Select one or more `Not Started` requirements that have all dependencies completed. Group them if it makes sense.
+2. **Checkout a feature branch:** Create and switch to a new branch for the requirement(s) (e.g., `git checkout -b req-NNN-feature-name`).
+3. **Restate the acceptance criteria as tests** before implementing. Each AC becomes at least one test.
+4. **Implement** the smallest change that satisfies the criteria.
+5. **Verify** with the commands in §4. Do not report completion without running them.
+6. **Commit and Merge**: Stage and commit your changes to the feature branch. Checkout the `dev` branch, merge the feature branch into `dev` using `--no-ff` to preserve branch history, and push `dev` to the remote repository.
+7. **Update the CSV**: Set `Status` to `Complete` and fill `Verified By`.
 
 **Rules:**
 
-- **One requirement per branch and per PR.** Branch naming: `req-016-tool-registry`.
 - **Reference the REQ ID in every commit**: `feat(agent): add tool registry [REQ-016]`.
-  Conventional commit prefixes: `feat`, `fix`, `test`, `docs`, `refactor`, `chore`.
 - **Do not edit requirement text, acceptance criteria, priority, or phase.** If a requirement
   is wrong, say what is wrong and propose the change — do not make it. `Status` and
   `Verified By` are the only columns you write.
@@ -183,8 +177,7 @@ handle in context, not the full body.
 
 ### Never
 
-- **`git push`.** Commit locally; the human reviews and pushes. No exceptions.
-- **Commit to `main`.** Work on a `req-NNN-*` branch.
+- **Push or commit directly to `main`.** You must push your progress to the `dev` branch. Create a feature branch, commit your work, merge into `dev` (with `--no-ff`), and push `dev` to remote.
 - **`git commit -a`.** Stage deliberately with `git add <path>`. Auto-staging sweeps up
   unrelated edits and misses new files.
 - **Read or write `.env`, `.env.*`, or any credentials file.** Not to inspect it, not to
