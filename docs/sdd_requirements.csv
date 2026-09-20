@@ -59,17 +59,17 @@ REQ-014,Infrastructure - Database,PostgreSQL for application data,"A PostgreSQL 
 REQ-015,Infrastructure - Database,pgvector for optional semantic memory,"PostgreSQL has pgvector extension enabled for storing and querying embeddings, used by agent memory and RAG.","1. pgvector extension is installed in the Postgres container.
 2. An embeddings table exists with: id, content, embedding (vector(384) or configurable), metadata (jsonb), created_at.
 3. Nearest-neighbor search (cosine similarity) returns results in <100ms for 100k rows.
-4. Embedding generation uses the same local model as REQ-009.",Complete,Antigravity Agent,REQ-014,Not Started,,
+4. Embedding generation uses the same local model as REQ-009.",P2 - Nice to Have,Phase 3,REQ-014,Complete,Antigravity Agent,2026-09-20
 REQ-016,Agent Core,OpenHands SDK as agent harness,"The agent uses OpenHands SDK for its core loop: event-driven step execution, action/observation model, tool dispatching, and workspace management.","1. openhands-sdk pinned to exact version across all 4 packages.
 2. Agent uses Agent+Conversation+Workspace primitives.
 3. Can execute file read/write, shell, web fetch.
 4. Emits structured events.
-5. Events sent to event bus.",P0 - Must Have,Phase 2,REQ-001,Not Started,,
+5. Events sent to event bus.",P0 - Must Have,Phase 2,REQ-001,Complete,Antigravity Agent,2026-09-20
 REQ-017,Agent Core,AgentRuntime abstraction layer,A thin Python interface (AgentRuntime) wraps OpenHands SDK so the rest of the application never imports OpenHands directly.,"1. AgentRuntime protocol defines: create_session, run, steer, cancel, approve_tool_call, close_session (all async).
 2. OpenHandsRuntime implements AgentRuntime.
 3. FakeRuntime implements AgentRuntime for unit tests.
 4. Application services depend only on AgentRuntime, never on openhands.*.
-5. Swapping the runtime requires only a DI configuration change.",P0 - Must Have,Phase 2,REQ-016,Not Started,,
+5. Swapping the runtime requires only a DI configuration change.",P0 - Must Have,Phase 2,REQ-016,Complete,Antigravity Agent,2026-09-20
 REQ-018,Agent Core,Planning before execution,The agent begins each task by generating an explicit plan (list of steps) before executing any tools. The plan is visible to the user and stored in the trace.,"1. On receiving a user query, the agent first emits a ""plan"" event containing a structured list of intended steps.
 2. Plan is stored in the conversation history and Langfuse trace.
 3. Plan is streamed to the user before execution begins.
@@ -88,7 +88,7 @@ REQ-020,Agent Core,Context compression,Long-running sessions use context compres
 REQ-021,Agent Core,Streaming events to frontend,All agent events are streamed in real-time via Redis Streams to reduce perceived latency and prevent event loss.,"1. FastAPI exposes SSE endpoint.
 2. Uses Redis Streams for pub/sub.
 3. Events have seq and Last-Event-ID.
-4. Stream is resumable without loss.",Complete,Antigravity Agent,REQ-016; REQ-033,Not Started,,
+4. Stream is resumable without loss.",P0 - Must Have,Phase 2,REQ-016; REQ-033,Complete,Antigravity Agent,2026-09-20
 REQ-022,Agent Core,Artifact generation and delivery,"The agent can produce structured artifacts (files, documents, code) and deliver them to the user via the API and frontend.","1. Agent can create artifacts: code files, markdown docs, PDF, DOCX, LaTeX-compiled documents.
 2. Artifacts are stored in Postgres (metadata) + filesystem or object storage (content).
 3. Each artifact has: id, name, mime_type, content_bytes, conversation_id, created_at.
@@ -129,7 +129,7 @@ REQ-029,Tools - Extended,RAG (Retrieval-Augmented Generation),"Agent can ingest 
 2. Tool: rag_query with query, collection_name, top_k params.
 3. Documents are chunked, embedded (local model), and stored in pgvector.
 4. Queries return top-k passages with relevance scores.
-5. RAG tool calls are traced in Langfuse.",Complete,Antigravity Agent,REQ-015; REQ-016,Not Started,,
+5. RAG tool calls are traced in Langfuse.",P1 - Should Have,Phase 3,REQ-015; REQ-016,Complete,Antigravity Agent,2026-09-20
 REQ-030,Tools - Extended,Image interpretation,Agent can analyze and describe images using a multimodal model.,"1. Tool: analyze_image with image_path or base64 content.
 2. Uses a multimodal model via LiteLLM (e.g. gemma4-e4b or a cloud vision model).
 3. Returns a text description, detected objects, or answers to questions about the image.
@@ -144,7 +144,7 @@ REQ-032,Interoperability - MCP,Agent tools exposed as MCP server,"The agent's to
 2. Tools are discoverable via the MCP tools/list endpoint.
 3. External clients can call tools via JSON-RPC over stdio or HTTP/SSE.
 4. Tool execution follows the same sandboxing and policy rules as internal calls.
-5. MCP server is optional and can be enabled/disabled via configuration.",Complete,Antigravity Agent,REQ-016,Not Started,,
+5. MCP server is optional and can be enabled/disabled via configuration.",P1 - Should Have,Phase 3,REQ-016,Complete,Antigravity Agent,2026-09-20
 REQ-033,API Layer,FastAPI backend,"FastAPI serves as the product API layer, handling authentication, session management, agent orchestration, and streaming.","1. FastAPI app starts at http://localhost:8000 with /docs (Swagger) and /redoc.
 2. API versioned under /api/v1/.
 3. Endpoints include: auth, users, conversations, messages, agent (run/stream/cancel), artifacts, tools, health.
@@ -180,7 +180,7 @@ REQ-039,Frontend,Production UI (customized Open WebUI or React),"For production,
 4. Workspace panel shows file tree and allows file inspection.
 5. Artifact panel displays previews (code, markdown, PDF, images) with download.
 6. Settings panel allows model selection from available aliases.
-7. Auth delegates to Authentik via OIDC.",Complete,Antigravity Agent,REQ-033; REQ-035,Not Started,,
+7. Auth delegates to Authentik via OIDC.",P1 - Should Have,Phase 3,REQ-033; REQ-035,Complete,Antigravity Agent,2026-09-20
 REQ-040,Infrastructure - DevOps,Docker Compose for local development,"A single docker-compose.yml brings up the entire development stack: FastAPI, Postgres, LiteLLM Proxy, Langfuse, Authentik, SearXNG, Redis, and Celery workers.","1. docker-compose up -d starts all services with no manual steps.
 2. .env.example documents all required environment variables.
 3. Postgres data is persisted via a named volume.
@@ -218,7 +218,7 @@ REQ-046,Infrastructure - Concurrency,Celery task queue for agent runs,"Agent run
 4. Multiple agent runs can execute concurrently (configurable worker concurrency).
 5. Task status is queryable via API (pending, running, completed, failed).
 6. SSE/WebSocket stream reads events from the Celery task in real-time.
-7. Worker count is independently scalable (docker-compose scale or K8s HPA).",P0 - Must Have,Phase 2,REQ-016; REQ-033,Not Started,,
+7. Worker count is independently scalable (docker-compose scale or K8s HPA).",P0 - Must Have,Phase 2,REQ-016; REQ-033,Complete,Antigravity Agent,2026-09-20
 REQ-047,Evaluation,Tiered evaluation (fast smoke + full benchmark),"The evaluation suite supports two tiers: a fast smoke test (20 items, <2 min) for CI on every change, and a full benchmark (200 items) for pre-deployment or manual testing.","1. scripts/run_evaluation.py accepts --tier fast|full.
 2. Fast tier uses a 20-item subset tagged 'smoke' in the Langfuse dataset.
 3. Full tier uses the complete 200-item dataset.
@@ -244,16 +244,16 @@ REQ-050,Agent Core,Human-in-the-loop tool approval,Certain irreversible or dange
 REQ-051,Security,Policy Engine (Guardrails),A synchronous policy engine sits below the AgentRuntime to enforce deterministic guardrails.,"1. Policy engine runs synchronously.
 2. Enforces run budgets and thrash breaking.
 3. Validates tool arguments.
-4. Fails closed on violation.",P0 - Must Have,Phase 2,REQ-017,Not Started,,
+4. Fails closed on violation.",P0 - Must Have,Phase 2,REQ-017,Complete,Antigravity Agent,2026-09-20
 REQ-052,Security,Secret Scrubbing & PII Redaction,All traces and logs are scrubbed of secrets and PII before being sent to observability platforms.,"1. Policy engine scrubs configured secrets.
 2. Redacts PII before sending to Langfuse.
 3. Fails closed if scrubber fails.",P0 - Must Have,Phase 2,REQ-051,Not Started,,
 REQ-053,Security,Workspace Containment & Shell Policy,File operations are strictly confined to the workspace via realpath checks. Shell commands are restricted.,"1. File operations use realpath to prevent path traversal.
 2. Shell commands checked against allowlist.
 3. Read-only rootfs in container.
-4. Dropped Linux capabilities.",P0 - Must Have,Phase 2,REQ-023; REQ-024; REQ-025,Not Started,,
+4. Dropped Linux capabilities.",P0 - Must Have,Phase 2,REQ-023; REQ-024; REQ-025,Complete,Antigravity Agent,2026-09-20
 REQ-054,Security,Egress & SSRF Protection,Outbound network access is restricted and SSRF protections applied to fetch_url.,"1. fetch_url blocks local/private IP ranges.
-2. Egress policy blocks non-approved outbound connections from the sandbox.",P1 - Should Have,Phase 2,REQ-026,Not Started,,
+2. Egress policy blocks non-approved outbound connections from the sandbox.",P1 - Should Have,Phase 2,REQ-026,Complete,Antigravity Agent,2026-09-20
 REQ-055,Security,Threat Model & Dependency Scanning,"A formal threat model exists, and CI pipelines include dependency scanning (pip-audit).","1. Threat model documented in docs.
 2. CI runs pip-audit on PRs.
 3. Container image scanning enabled.",P0 - Must Have,Phase 1,None,Not Started,,
