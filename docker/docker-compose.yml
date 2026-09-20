@@ -1,4 +1,3 @@
-
 services:
   postgres:
     image: pgvector/pgvector:pg15
@@ -8,6 +7,8 @@ services:
       POSTGRES_DB: forge
     ports:
       - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
 
   langfuse-db:
     image: postgres:15
@@ -17,13 +18,39 @@ services:
       POSTGRES_DB: langfuse
     ports:
       - "5433:5432"
+    volumes:
+      - langfuse_db_data:/var/lib/postgresql/data
+
+  langfuse-server:
+    image: ghcr.io/langfuse/langfuse:2
+    depends_on:
+      - langfuse-db
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres_password@langfuse-db:5432/langfuse
+      - NEXTAUTH_URL=http://localhost:3000
+      - NEXTAUTH_SECRET=secret_development_nextauth_jwt_key
+      - SALT=salt_development_key
 
   litellm:
     image: ghcr.io/berriai/litellm:main-latest
-    environment:
-      - LITELLM_MASTER_KEY=sk-1234
     ports:
       - "4000:4000"
+    environment:
+      - LITELLM_MASTER_KEY=sk-1234
+    volumes:
+      - ./litellm_config.yaml:/app/config.yaml
+    command: --config /app/config.yaml --port 4000
+
+  searxng:
+    image: searxng/searxng:latest
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./searxng/settings.yml:/etc/searxng/settings.yml:ro
+    environment:
+      - SEARXNG_BASE_URL=http://localhost:8080/
 
   redis-cache:
     image: redis:7
@@ -43,3 +70,7 @@ services:
       - "8025:8025"
     environment:
       MP_MAX_MESSAGES: 1000
+
+volumes:
+  postgres_data:
+  langfuse_db_data:
