@@ -77,7 +77,12 @@ def fetch_url(
         return "Error: Could not resolve hostname"
 
     try:
-        with httpx.Client(follow_redirects=True, timeout=10.0) as client:
+        headers = {
+            "User-Agent": "JOHarness/1.0 (https://github.com/ZeZenoglio/forge-agent-harness; agent@joharness.org)"
+        }
+        with httpx.Client(
+            follow_redirects=True, timeout=10.0, headers=headers
+        ) as client:
             response = client.get(url)
             response.raise_for_status()
             text_content = _strip_html(response.text)
@@ -96,7 +101,19 @@ def web_search(
     deny_list: list[str] | None = None,
 ) -> list[dict[str, str]] | dict[str, str]:
     """Search the web via self-hosted SearXNG JSON API aggregating Google, Bing, DuckDuckGo."""
-    endpoint = searxng_url or os.getenv("SEARXNG_URL", "http://searxng:8080")
+    endpoint = searxng_url or os.getenv("SEARXNG_URL")
+    if not endpoint:
+        try:
+            socket.gethostbyname("searxng")
+            endpoint = "http://searxng:8080"
+        except socket.gaierror:
+            endpoint = "http://localhost:8080"
+    elif "searxng:8080" in endpoint:
+        try:
+            socket.gethostbyname("searxng")
+        except socket.gaierror:
+            endpoint = endpoint.replace("searxng:8080", "localhost:8080")
+
     encoded_query = quote_plus(query)
     target_url = f"{endpoint}/search?q={encoded_query}&format=json&engines=google,bing,duckduckgo"
 

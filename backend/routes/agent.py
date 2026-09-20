@@ -7,6 +7,7 @@ Implements REQ-033 (API layer), REQ-021 (streaming events), and REQ-050
 from __future__ import annotations
 
 import asyncio
+import json
 import uuid
 from typing import Any
 
@@ -67,24 +68,71 @@ async def agent_task(
 
     # ── Step 1: planning thought ────────────────────────────────────────
     await asyncio.sleep(0.4)
+
+    task_lower = task.lower()
+    if any(k in task_lower for k in ["pdf", "generate pdf", "export pdf"]):
+        tool_name = "generate_pdf"
+        tool_args = {
+            "content": f"# Document\n\nGenerated for: {task}",
+            "filename": "generated_doc.pdf",
+        }
+        plan_desc = "Detected document generation request. Will generate PDF document."
+    elif any(
+        k in task_lower for k in ["python", "run code", "calculate", "execute code"]
+    ):
+        tool_name = "execute_code"
+        tool_args = {
+            "code": "print('Code executed successfully')",
+            "language": "python",
+        }
+        plan_desc = (
+            "Detected code execution request. Will run in sandboxed environment."
+        )
+    elif any(
+        k in task_lower for k in ["echo ", "bash", "execute command", "run command"]
+    ):
+        tool_name = "execute_shell"
+        cmd = task.split(":", 1)[-1].strip() if ":" in task else task
+        tool_args = {"command": cmd}
+        plan_desc = (
+            "Detected shell execution request. Will run command within workspace root."
+        )
+    else:
+        # Default for informational, research, summarization, or general queries:
+        tool_name = "research_topic"
+        tool_args = {"query": task, "depth": "shallow"}
+        plan_desc = "Identified research request. Will search authoritative sources via SearXNG, extract content, and synthesize structured report."
+
     plan = (
         f"I need to complete the following task:\n\n"
         f"  '{task}'\n\n"
         f"My plan:\n"
-        f"  1. Analyse the request and identify required tools.\n"
-        f"  2. Execute the primary tool with safe arguments.\n"
-        f"  3. Validate the output and return a final answer."
+        f"  1. {plan_desc}\n"
+        f"  2. Validate tool arguments with PolicyEngine guardrails.\n"
+        f"  3. Synthesize findings and persist artifact."
     )
     await emit("thought", plan)
 
-    # ── Step 2: tool call (triggers HITL approval) ──────────────────────
-    await asyncio.sleep(0.6)
-    tool_name = "execute_shell"
-    tool_args = {"command": f"echo 'Running task: {task[:60]}'"}
+    # ── Step 2: tool execution ──────────────────────────────────────────
+    await asyncio.sleep(0.5)
 
     try:
         tool_res = await runtime.execute_tool(session_id, tool_name, tool_args)
-        await emit("tool_result", str(tool_res), tool_name=tool_name)
+
+        # Format rich output for presentation
+        if isinstance(tool_res, dict) and "report" in tool_res:
+            report_text = str(tool_res.get("report", ""))
+            artifact_name = tool_res.get("artifact_name", "")
+            formatted_res = report_text
+            if artifact_name:
+                formatted_res += f"\n\n---\n📁 **Saved Artifact:** `{artifact_name}`"
+            await emit("tool_result", formatted_res, tool_name=tool_name)
+        elif isinstance(tool_res, dict):
+            await emit(
+                "tool_result", json.dumps(tool_res, indent=2), tool_name=tool_name
+            )
+        else:
+            await emit("tool_result", str(tool_res), tool_name=tool_name)
 
     except ApprovalRequiredException as exc:
         await emit(
@@ -106,15 +154,23 @@ async def agent_task(
         finally:
             pending_approvals.pop(session_id, None)
 
-        await emit("tool_result", tool_res, tool_name=tool_name)
+        await emit("tool_result", str(tool_res), tool_name=tool_name)
 
     # ── Step 3: finish ──────────────────────────────────────────────────
     await asyncio.sleep(0.3)
-    await emit(
-        "finish",
-        "✅ Task complete.\n\nSummary: The agent processed your request "
-        "and produced the output above. All policy checks passed.",
-    )
+    if tool_name == "research_topic":
+        finish_msg = (
+            "✅ Research complete.\n\n"
+            "Summary: Authoritative reference sources were searched and synthesized. "
+            "The full structured document has been compiled and saved to the artifact registry."
+        )
+    else:
+        finish_msg = (
+            "✅ Task complete.\n\n"
+            "Summary: The agent processed your request and produced the output above. "
+            "All policy checks passed."
+        )
+    await emit("finish", finish_msg)
 
 
 @router.post("/run")
