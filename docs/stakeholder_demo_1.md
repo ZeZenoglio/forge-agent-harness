@@ -1,54 +1,70 @@
-# JO Harness — Stakeholder Demo 1
+# JO Harness — Stakeholder Demo Script
 
-This document outlines a structured, step-by-step demonstration to walk stakeholders through the current capabilities of the JO Harness platform.
-
-## Goal of the Demo
-To prove that JO Harness is a secure, modular, enterprise-ready platform capable of running autonomous AI agents with strict safety guardrails, advanced memory capabilities, and deep interoperability.
+**Presenter Note:** This script is designed for a 10-15 minute live demonstration to stakeholders. The goal is to prove the platform is secure, modular, visually interactive via API, and production-ready, even before the final React frontend is built.
 
 ---
 
-### Step 1: The Core Architecture (Modularity)
-**Objective:** Show that the platform is not permanently tied to one specific underlying framework, minimizing vendor lock-in.
-
-* **What to show:** Open `backend/agent/openhands_runtime.py`.
-* **Talking points:**
-  * Notice how all agent actions flow through our `AgentRuntime` protocol. 
-  * Currently, this is powered by OpenHands under the hood, but the product code never touches OpenHands directly. If we want to swap to a different open-source harness next year, we only replace this one adapter file.
-
-### Step 2: The Policy Engine (Safety First)
-**Objective:** Prove that the agent is sandboxed and cannot perform unauthorized or destructive actions on the host machine.
-
-* **What to show:** Open `backend/agent/policies.py` and run a quick unit test (`uv run pytest tests/unit/test_policies.py`).
-* **Talking points:**
-  * **Path Containment:** The agent is physically locked to a specific workspace root (e.g. `/tmp/forge_workspace`). Any attempt to traverse out of this folder (`../../etc/passwd`) is caught and blocked by the `PolicyEngine`.
-  * **Human-in-the-Loop (HITL):** Show the tool interception logic. If the agent tries to run destructive tools like `delete_file` or `send_email`, it raises an `ApprovalRequiredException`. Execution pauses until a human physically clicks "Approve".
-  * **Hallucination Catching:** Explain the `validate_citations` method. If the agent generates a quote and claims it came from a document, our regex extracts it and verifies the quote physically exists in the source text. If not, the engine rejects the response.
-
-### Step 3: Advanced Agent Capabilities (Memory & Orchestration)
-**Objective:** Highlight the advanced features that make the agent smart and scalable.
-
-* **What to show:** The `backend/tools/rag.py` and `backend/tools/delegation.py` files.
-* **Talking points:**
-  * **RAG (Retrieval-Augmented Generation):** The agent can self-manage its memory using semantic vector embeddings (`SentenceTransformer`). It uses `memorize` to store knowledge and `search_memory` to recall it logically.
-  * **Parallel Sub-Agents:** When a task is too complex, the primary agent can spawn multiple *parallel* sub-agents (via `delegate_task`). Each sub-agent gets its own workspace context, works independently, and returns a rich trace of its logic trajectory back to the master agent.
-
-### Step 4: Interoperability (MCP & A2A)
-**Objective:** Show that the agent is a good citizen in the broader AI ecosystem.
-
-* **What to show:** `backend/mcp/server.py` and `backend/api/routes_a2a.py`.
-* **Talking points:**
-  * **Model Context Protocol (MCP):** We expose the agent's tool catalog securely over stdio using FastMCP. Any standard IDE (like Cursor or Windsurf) can connect to this platform and utilize our sandboxed tools directly.
-  * **Agent-to-Agent (A2A):** We conform to the draft A2A JSON-RPC specification. External agents from entirely different platforms can send tasks to our agent and get streaming SSE updates on progress.
-
-### Step 5: Enterprise Infrastructure
-**Objective:** Prove that this isn't just a prototype, but a system ready for production scale.
-
-* **What to show:** The `docker/docker-compose.yml` and the `k8s/` folder.
-* **Talking points:**
-  * For local dev, a single `docker-compose` brings up Postgres (with pgvector), Redis, LiteLLM, and an SMTP mock server (Mailpit).
-  * We also have auto-generated Kubernetes manifests for every component. Whether we deploy on local Minikube or cloud-based GKE, the services are fully decoupled and scalable.
+## 🛠️ Prep Work (Before the meeting starts)
+1. **Start the Database & SMTP Mock:**
+   ```bash
+   docker-compose up -d postgres mailpit
+   ```
+2. **Start the API Server:**
+   ```bash
+   uv run uvicorn backend.api.main:app --reload
+   ```
+3. **Open Browser Tabs:**
+   - Tab 1: `docs/architecture.html` (The Architecture Diagram)
+   - Tab 2: `http://localhost:8000/docs` (FastAPI Swagger UI)
+   - Tab 3: `http://localhost:8025` (Mailpit Web UI)
 
 ---
 
-## Wrap Up / Q&A
-* "As you can see, Phase 1 through 3 of our requirements are now completed. We have a robust, secure backend that handles agent orchestration, memory, and interoperability. The next natural step is to attach the React frontend so we can interact with it visually."
+## 🎙️ The Presentation
+
+### Introduction (Tab 1: Architecture)
+**Action:** Open Tab 1 showing the interactive `architecture.html`.
+
+**Script:**
+> "Welcome everyone. Today we are demonstrating the core engine of the JO Harness platform. Before we look at the live system, I want to show you our architecture diagram.
+> 
+> As you can see, our system is entirely modular. The most critical decision we made was to isolate our product code from the underlying AI framework (like OpenHands). We communicate entirely through an `AgentRuntime` protocol. If the AI landscape shifts tomorrow, we can swap out the underlying agent framework without touching our APIs, databases, or frontend."
+
+### Step 1: The API in Action (Tab 2: Swagger UI)
+**Action:** Switch to Tab 2 (`http://localhost:8000/docs`).
+
+**Script:**
+> "Let's look at the live system. What you are seeing here is the interactive API dashboard that powers the platform. This is fully automatically generated from our code.
+> 
+> Every capability of our agent—running tasks, streaming responses, and managing memory—is exposed here. This means the agent isn't just a chatbot; it can be integrated into any existing enterprise system, triggered by webhooks, or controlled programmatically."
+
+**Action:** Expand the `/api/v1/a2a` (Agent-to-Agent) routes to show them on screen.
+> "For example, look at our A2A (Agent-to-Agent) endpoints. We comply with the draft JSON-RPC specification. This means our agent can receive tasks from *other* external agents across different platforms, acting as a specialized worker in a larger multi-agent ecosystem."
+
+### Step 2: Safety & The Policy Engine (Terminal)
+**Action:** Bring up your terminal.
+
+**Script:**
+> "A major concern with autonomous agents is safety. We've built a strict `PolicyEngine` that intercepts everything the agent tries to do. 
+> Let's look at how it catches LLM hallucinations."
+
+**Action:** Run the tests: `uv run pytest tests/unit/test_policies.py`
+> "Here, our tests are passing immediately. The policy engine uses a Human-in-the-Loop system. If the agent tries to delete a file, or send an email, it is physically paused and blocked until a human clicks 'Approve'. Furthermore, if the agent hallucinates a fake quote and claims it came from a document, our engine scans the text and rejects the response. Safety is baked in at the lowest level."
+
+### Step 3: Enterprise Readiness (Tab 3: Mailpit)
+**Action:** Switch to Tab 3 (`http://localhost:8025`).
+
+**Script:**
+> "Finally, let's talk about real-world connectivity. We've just implemented an Email Integration tool allowing the agent to draft and send emails.
+> 
+> To develop this safely, we use a local SMTP testing server called Mailpit. When the agent sends an email, it gets caught right here in this local dashboard. This proves we can integrate with external tools seamlessly.
+> 
+> Beyond this, we have already generated full Kubernetes manifests for every piece of this infrastructure, meaning we are ready to deploy to production at any time."
+
+### Wrap Up
+**Script:**
+> "To summarize: Phase 1 through 3 are complete. We have a secure, interoperable, memory-capable agent backend. 
+> 
+> Our next step—Phase 4—is attaching a rich React frontend to this API, which will give our end users a beautiful, chat-like interface to collaborate with the agent. 
+> 
+> Any questions?"
