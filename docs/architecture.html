@@ -323,7 +323,7 @@
       <h1>JO Harness — System Architecture</h1>
       <p>Model-Agnostic, Open-Weight Agent Platform</p>
       <div class="meta-bar">
-        <span class="meta-tag"><span class="dot" style="background:var(--green)"></span> Default SLM: qwen3.5:4b</span>
+        <span class="meta-tag"><span class="dot" style="background:var(--green)"></span> 4-Tier Model Cascade</span>
         <span class="meta-tag"><span class="dot" style="background:var(--accent)"></span> Harness: OpenHands SDK</span>
         <span class="meta-tag"><span class="dot" style="background:var(--orange)"></span> Gateway: LiteLLM Proxy</span>
         <span class="meta-tag"><span class="dot" style="background:var(--pink)"></span> Auth: Authentik (OIDC)</span>
@@ -495,6 +495,14 @@
               </div>
               <div class="node-desc">Mutable state object updated at each agent loop iteration. Holds accumulated observations, plan progress, and intermediate results.</div>
             </div>
+            <div class="node">
+              <div class="node-name">
+                Policy Engine
+                <span class="node-tech">Guardrails</span>
+                <span class="phase-badge phase-2">Phase 2</span>
+              </div>
+              <div class="node-desc">Synchronous deterministic guardrails. Enforces token/run budgets, thrasher breaker, argument validation, and PII/Secret scrubbing.</div>
+            </div>
           </div>
         </div>
       </div>
@@ -577,7 +585,7 @@
               </div>
               <div class="node-desc">OpenAI-compatible gateway. Holds all provider credentials. Enforces budgets, routing, and failover.</div>
               <ul class="node-list">
-                <li>Virtual aliases: default-agent, reasoning-large, reviewer</li>
+                <li>Virtual aliases: default-agent, utility-small, summarizer, reviewer</li>
                 <li>Multi-deployment load balancing</li>
                 <li>Automatic failover on quota/error</li>
                 <li>Per-user/team budget caps</li>
@@ -589,7 +597,7 @@
               <div class="nodes" style="margin-top: 8px; gap: 8px;">
                 <div class="node" style="min-width: 120px; padding: 10px;">
                   <div class="node-name" style="font-size: 0.8rem;">🦙 Ollama</div>
-                  <div class="node-desc">qwen3.5:4b (default)<br>gemma4:e4b (multimodal)</div>
+                  <div class="node-desc">qwen3.5:4b (default-agent)<br>qwen2.5:1.5b (utility)<br>qwen3.5:9b (reviewer)</div>
                 </div>
                 <div class="node" style="min-width: 120px; padding: 10px;">
                   <div class="node-name" style="font-size: 0.8rem;">☁️ Cloud (future)</div>
@@ -709,16 +717,32 @@
               <div class="node-desc">:5433</div>
             </div>
             <div class="node" style="text-align: center; min-width: 100px; flex: 0;">
-              <div class="node-name" style="justify-content: center; font-size: 0.78rem;">langfuse</div>
+              <div class="node-name" style="justify-content: center; font-size: 0.78rem;">langfuse-clickhouse</div>
+              <div class="node-desc">:8123</div>
+            </div>
+            <div class="node" style="text-align: center; min-width: 100px; flex: 0;">
+              <div class="node-name" style="justify-content: center; font-size: 0.78rem;">langfuse-minio</div>
+              <div class="node-desc">:9001</div>
+            </div>
+            <div class="node" style="text-align: center; min-width: 100px; flex: 0;">
+              <div class="node-name" style="justify-content: center; font-size: 0.78rem;">langfuse-web</div>
               <div class="node-desc">:3000</div>
+            </div>
+            <div class="node" style="text-align: center; min-width: 100px; flex: 0;">
+              <div class="node-name" style="justify-content: center; font-size: 0.78rem;">langfuse-worker</div>
+              <div class="node-desc">worker</div>
             </div>
             <div class="node" style="text-align: center; min-width: 100px; flex: 0;">
               <div class="node-name" style="justify-content: center; font-size: 0.78rem;">litellm</div>
               <div class="node-desc">:4000</div>
             </div>
             <div class="node" style="text-align: center; min-width: 100px; flex: 0;">
-              <div class="node-name" style="justify-content: center; font-size: 0.78rem;">redis</div>
+              <div class="node-name" style="justify-content: center; font-size: 0.78rem;">redis-cache</div>
               <div class="node-desc">:6379</div>
+            </div>
+            <div class="node" style="text-align: center; min-width: 100px; flex: 0;">
+              <div class="node-name" style="justify-content: center; font-size: 0.78rem;">redis-stream</div>
+              <div class="node-desc">:6380</div>
             </div>
             <div class="node" style="text-align: center; min-width: 100px; flex: 0;">
               <div class="node-name" style="justify-content: center; font-size: 0.78rem;">authentik</div>
@@ -735,6 +759,10 @@
             <div class="node" style="text-align: center; min-width: 100px; flex: 0;">
               <div class="node-name" style="justify-content: center; font-size: 0.78rem;">celery</div>
               <div class="node-desc">worker</div>
+            </div>
+            <div class="node" style="text-align: center; min-width: 100px; flex: 0;">
+              <div class="node-name" style="justify-content: center; font-size: 0.78rem;">mailpit</div>
+              <div class="node-desc">:8025</div>
             </div>
           </div>
           <div style="margin-top: 12px; font-size: 0.72rem; color: var(--text-dim); text-align: center;">
@@ -762,11 +790,11 @@
             </div>
             <div class="node">
               <div class="node-name">MCP Server <span class="node-tech">JSON-RPC 2.0</span></div>
-              <div class="node-desc">Tools exposed as MCP resources. IDEs (VS Code, Cursor) and other agents discover and invoke tools via stdio or HTTP/SSE.</div>
+              <div class="node-desc">Tools exposed as MCP resources (stateless 2026-07-28 spec). IDEs (VS Code, Cursor) and other agents discover and invoke tools via stdio or HTTP/SSE.</div>
             </div>
             <div class="node">
               <div class="node-name">A2A Protocol <span class="node-tech">JSON-RPC + SSE</span></div>
-              <div class="node-desc">Agent Card at /.well-known/agent.json. External agents delegate tasks and receive streaming updates.</div>
+              <div class="node-desc">Agent Card at /.well-known/agent-card.json. External agents delegate tasks and receive streaming updates.</div>
             </div>
             <div class="node">
               <div class="node-name">LiteLLM Gateway <span class="node-tech">OpenAI-compatible</span></div>
@@ -778,7 +806,7 @@
     </div>
 
     <footer>
-      <p>JO Harness Architecture — v1.0 — September 2026</p>
+      <p>JO Harness Architecture — v2.0 (Post-Audit) — September 2026</p>
       <p style="margin-top: 4px;">Built with OpenHands SDK • FastAPI • LiteLLM • Langfuse • PostgreSQL • Authentik • SearXNG • Celery</p>
     </footer>
   </div>

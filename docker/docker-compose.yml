@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: forge
+      POSTGRES_PASSWORD: forge_password
+      POSTGRES_DB: forge
+    ports:
+      - "5432:5432"
+
+  langfuse-db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres_password
+      POSTGRES_DB: langfuse
+    ports:
+      - "5433:5432"
+
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    environment:
+      - LITELLM_MASTER_KEY=sk-1234
+    ports:
+      - "4000:4000"
+
+  redis-cache:
+    image: redis:7
+    command: redis-server --maxmemory-policy noeviction
+    ports:
+      - "6379:6379"
+
+  redis-stream:
+    image: redis:7
+    ports:
+      - "6380:6379"
