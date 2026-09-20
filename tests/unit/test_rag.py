@@ -2,6 +2,7 @@ import pytest
 
 from backend.agent.policies import PolicyEngine
 
+
 def test_citation_validation_success():
     engine = PolicyEngine(workspace_root="/tmp")
     context = ["This is a test document containing important information.", "Another document."]

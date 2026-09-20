@@ -92,6 +92,9 @@ class PolicyEngine:
         # We can expand this list (e.g., deleting files, sending emails)
         if tool_name == "delete_file":
             raise ApprovalRequiredException(f"Deleting file requires human approval: {arguments.get('path')}")
+            
+        if tool_name == "send_email":
+            raise ApprovalRequiredException(f"Sending email to {arguments.get('to_address')} requires human approval.")
 
     def validate_citations(self, response: str, context: list[str]) -> bool:
         """

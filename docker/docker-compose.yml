@@ -36,3 +36,11 @@ services:
     image: redis:7
     ports:
       - "6380:6379"
+
+  mailpit:
+    image: axllent/mailpit
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    environment:
+      MP_MAX_MESSAGES: 1000
