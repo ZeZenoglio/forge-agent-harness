@@ -3,26 +3,26 @@ REQ-001,Infrastructure - LLM Gateway,LiteLLM Proxy as model gateway,"LiteLLM Pro
 2. A virtual model alias ""default-agent"" resolves to qwen3.5:4b on Ollama.
 3. Switching to a cloud model (e.g. gpt-4o) requires only a config change in LiteLLM, no code change in the agent.
 4. LiteLLM tracks token usage, cost, and latency per request.
-5. Budget caps can be set per virtual key; requests exceeding the cap are rejected with a 429.",P0 - Must Have,Phase 1,Ollama installed and running,Not Started,,
+5. Budget caps can be set per virtual key; requests exceeding the cap are rejected with a 429.",P0 - Must Have,Phase 1,Ollama installed and running,Complete,Antigravity Agent,2026-09-20
 REQ-002,Infrastructure - LLM Gateway,Model aliasing and routing,"LiteLLM manages logical model profiles (e.g. default-agent, reasoning-large, reviewer) that map to physical model deployments.","1. At least 3 virtual aliases defined: default-agent, reasoning-large, reviewer.
 2. A single alias can map to multiple deployments (e.g. two Ollama instances of the same model for load balancing).
 3. If one deployment hits a quota or fails, LiteLLM falls back to the next deployment automatically.
-4. Alias-to-model mapping is stored in LiteLLM config, not application code.",P1 - Should Have,Phase 2,REQ-001,Not Started,,
+4. Alias-to-model mapping is stored in LiteLLM config, not application code.",P1 - Should Have,Phase 2,REQ-001,Complete,Antigravity Agent,2026-09-20
 REQ-003,Infrastructure - LLM Gateway,Multi-deployment and failover for a single model,"LiteLLM can manage multiple physical deployments behind a single alias, supporting load distribution and automatic failover.","1. Two deployments of qwen3.5:4b can be registered under one alias.
 2. If deployment A returns 5xx or timeout, the request is retried on deployment B.
 3. Round-robin or least-latency routing is configurable.
-4. Failover events are logged to Langfuse.",P2 - Nice to Have,Phase 3,REQ-001; REQ-002,Not Started,,
+4. Failover events are logged to Langfuse.",P2 - Nice to Have,Phase 3,REQ-001; REQ-002,Complete,Antigravity Agent,2026-09-20
 REQ-004,Infrastructure - Observability,Self-hosted Langfuse via Docker Compose,"Langfuse runs as a self-hosted service (docker-compose) with its own Postgres database, providing trace/span/generation UI and evaluation capabilities.","1. Langfuse is accessible at http://localhost:3000 after docker-compose up.
 2. Langfuse Postgres DB is separate from application Postgres.
 3. Agent traces appear in the Langfuse UI within 5 seconds of generation.
-4. Traces include: parent agent trace, child LLM generation spans, child tool-call spans, user_id, session_id, model name, token counts.",P0 - Must Have,Phase 1,None,Not Started,,
+4. Traces include: parent agent trace, child LLM generation spans, child tool-call spans, user_id, session_id, model name, token counts.",P0 - Must Have,Phase 1,None,Complete,Antigravity Agent,2026-09-20
 REQ-005,Infrastructure - Observability,Structured agentic trace per call,Each agentic call produces a hierarchical trace in Langfuse: agent-trace → planning-span → tool-call-spans → llm-generation-spans → final-answer-span.,"1. Parent trace carries: user_id, session_id, input query, final output, total latency, total tokens, total cost.
 2. Each LLM generation span includes: model name, prompt tokens, completion tokens, latency, temperature.
 3. Each tool-call span includes: tool name, input args, output/error, latency.
-4. Traces are queryable by user, session, model, date, and tags.",P0 - Must Have,Phase 1,REQ-004,Not Started,,
+4. Traces are queryable by user, session, model, date, and tags.",P0 - Must Have,Phase 1,REQ-004,Complete,Antigravity Agent,2026-09-20
 REQ-006,Infrastructure - Observability,LiteLLM → Langfuse integration,"LiteLLM Proxy is configured to emit generation-level telemetry to Langfuse, so every LLM call is traced automatically.","1. LiteLLM config includes Langfuse callback with LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, LANGFUSE_HOST.
 2. Every LLM call made through LiteLLM appears as a generation in Langfuse with model, tokens, cost, latency.
-3. LiteLLM-emitted generations are linked to the parent agent trace via trace_id passed in metadata.",P0 - Must Have,Phase 1,REQ-001; REQ-004,Not Started,,
+3. LiteLLM-emitted generations are linked to the parent agent trace via trace_id passed in metadata.",P0 - Must Have,Phase 1,REQ-001; REQ-004,Complete,Antigravity Agent,2026-09-20
 REQ-007,Evaluation,Track A Benchmark and Track B Suite,Track A uses a TriviaQA subset for regression. Track B uses a 30-item internal agentic task suite with programmatic verifiers.,"1. Track A dataset (TriviaQA subset) loaded in Langfuse.
 2. Track B dataset (30 custom agentic tasks) loaded.
 3. Track B includes verifier scripts.
@@ -74,17 +74,17 @@ REQ-018,Agent Core,Planning before execution,The agent begins each task by gener
 2. Plan is stored in the conversation history and Langfuse trace.
 3. Plan is streamed to the user before execution begins.
 4. Agent references the plan during execution and can revise it mid-task.
-5. If the model cannot produce a valid plan, the agent degrades gracefully to direct execution.",P0 - Must Have,Phase 2,REQ-016; REQ-017,Not Started,,
+5. If the model cannot produce a valid plan, the agent degrades gracefully to direct execution.",P0 - Must Have,Phase 2,REQ-016; REQ-017,Complete,Antigravity Agent,2026-09-20
 REQ-019,Agent Core,Iterative tool/sub-agent orchestration,"At each turn of the agent loop, the agent decides whether to call a tool, delegate to a sub-agent, or conclude. A shared state object is updated at each step.","1. Agent loop supports: tool-call, sub-agent-delegation, direct-answer, and conclude actions.
 2. A shared state dict is maintained across loop iterations (accessible to the agent's context).
 3. Each iteration updates state with new observations.
 4. Agent evaluates at each turn whether it has sufficient information to answer.
-5. Loop has a configurable max-iterations safety limit (default: 15).",P0 - Must Have,Phase 2,REQ-016; REQ-017; REQ-018,Not Started,,
+5. Loop has a configurable max-iterations safety limit (default: 15).",P0 - Must Have,Phase 2,REQ-016; REQ-017; REQ-018,Complete,Antigravity Agent,2026-09-20
 REQ-020,Agent Core,Context compression,Long-running sessions use context compression (rolling summaries or recursive summarization) to stay within the model's context window.,"1. When accumulated context exceeds a configurable threshold (e.g. 80% of model context window), compression is triggered.
 2. Compression produces a condensed summary of prior turns while preserving: system prompt, tool definitions, current plan, and recent N turns.
 3. Compressed context is logged to Langfuse (pre/post token counts).
 4. Agent behavior remains coherent after compression (verified by evaluation suite).
-5. Compression strategy is configurable (rolling-summary, truncate-oldest, recursive).",P1 - Should Have,Phase 2,REQ-016; REQ-017,Not Started,,
+5. Compression strategy is configurable (rolling-summary, truncate-oldest, recursive).",P1 - Should Have,Phase 2,REQ-016; REQ-017,Complete,Antigravity Agent,2026-09-20
 REQ-021,Agent Core,Streaming events to frontend,All agent events are streamed in real-time via Redis Streams to reduce perceived latency and prevent event loss.,"1. FastAPI exposes SSE endpoint.
 2. Uses Redis Streams for pub/sub.
 3. Events have seq and Last-Event-ID.
@@ -93,7 +93,7 @@ REQ-022,Agent Core,Artifact generation and delivery,"The agent can produce struc
 2. Artifacts are stored in Postgres (metadata) + filesystem or object storage (content).
 3. Each artifact has: id, name, mime_type, content_bytes, conversation_id, created_at.
 4. Artifacts are downloadable via GET /api/v1/artifacts/{id}.
-5. Frontend displays artifact previews inline and offers download.",P1 - Should Have,Phase 2,REQ-014; REQ-016; REQ-017,Not Started,,
+5. Frontend displays artifact previews inline and offers download.",P1 - Should Have,Phase 2,REQ-014; REQ-016; REQ-017,Complete,Antigravity Agent,2026-09-20
 REQ-023,Tools - Core,File read and search,"Agent can read files from the workspace, search file contents (grep-like), and list directory structures.","1. Tools: read_file, search_files, list_directory.
 2. All operations are sandboxed to the agent's workspace root.
 3. search_files supports regex and glob patterns.
@@ -186,7 +186,7 @@ REQ-040,Infrastructure - DevOps,Docker Compose for local development,"A single d
 3. Postgres data is persisted via a named volume.
 4. Hot-reload is enabled for FastAPI (volume-mounted source code).
 5. docker-compose down -v cleanly tears down all containers and volumes.
-6. Services include: postgres, langfuse-db, langfuse, litellm, authentik-server, authentik-worker, redis, searxng, celery-worker.",P0 - Must Have,Phase 1,REQ-001; REQ-004; REQ-049,Not Started,,
+6. Services include: postgres, langfuse-db, langfuse, litellm, authentik-server, authentik-worker, redis, searxng, celery-worker.",P0 - Must Have,Phase 1,REQ-001; REQ-004; REQ-049,Complete,Antigravity Agent,2026-09-20
 REQ-041,Infrastructure - DevOps,Kubernetes-ready containerization,"Each service (FastAPI, Postgres, LiteLLM, Langfuse) has a production Dockerfile and can be deployed to Kubernetes with Helm charts or manifests.","1. Dockerfiles use multi-stage builds with minimal final images.
 2. Services communicate via Kubernetes service DNS names.
 3. Secrets are injected via Kubernetes Secrets or external secret managers.
@@ -196,7 +196,7 @@ REQ-042,Agent Core,SLM model selection (qwen3.5:4b default),"The default local S
 2. LiteLLM alias ""default-agent"" routes to ollama/qwen3.5:4b.
 3. Agent system prompt is optimized for qwen3.5's tool-calling template.
 4. Model can be swapped by changing only the LiteLLM config (no code change).
-5. A MODELS.md doc lists tested models, their aliases, and known quirks.",P0 - Must Have,Phase 1,REQ-001,Not Started,,
+5. A MODELS.md doc lists tested models, their aliases, and known quirks.",P0 - Must Have,Phase 1,REQ-001,Complete,Antigravity Agent,2026-09-20
 REQ-043,Tools - Extended,Sub-agent delegation,"The agent can spawn sub-agents for specialized tasks (e.g. research, code review, document drafting) that run independently and report back.","1. A delegation tool allows the agent to spawn a sub-agent with a specific task, tools subset, and model alias.
 2. Sub-agents run as separate conversations inheriting workspace context.
 3. Sub-agent results are returned to the parent agent as observations.
@@ -235,7 +235,7 @@ REQ-049,Infrastructure,SearXNG self-hosted meta-search,"A self-hosted SearXNG in
 2. JSON API is accessible at http://searxng:8080/search?format=json.
 3. Search engines configured: Google, Bing, DuckDuckGo (via settings.yml).
 4. Rate limiting is configured to avoid upstream blocks.
-5. No external API keys required.",P1 - Should Have,Phase 1,None,Not Started,,
+5. No external API keys required.",P1 - Should Have,Phase 1,None,Complete,Antigravity Agent,2026-09-20
 REQ-050,Agent Core,Human-in-the-loop tool approval,Certain irreversible or dangerous actions require explicit user approval before execution.,"1. Policy classifies actions requiring approval.
 2. Approval event emitted to stream.
 3. Timeout defaults to deny after 5 mins.
@@ -270,11 +270,11 @@ REQ-059,Agent Core,Model Cascade,Four defined model aliases route to specialized
 3. summarizer.
 4. reviewer (high capacity, temp=0).",P0 - Must Have,Phase 1,REQ-002,Complete,Antigravity Agent,2026-09-20
 REQ-060,NFR,Latency Budget,Agent time-to-first-token and time-to-completion are within acceptable limits.,"1. Latency metrics recorded in Langfuse.
-2. Regression tests in CI gate on p95 latency.",P0 - Must Have,Phase 1,None,Not Started,,
+2. Regression tests in CI gate on p95 latency.",P0 - Must Have,Phase 1,None,Complete,Antigravity Agent,2026-09-20
 REQ-061,NFR,Concurrency Target,The system supports a defined number of concurrent user sessions.,"1. Configurable worker concurrency in Celery.
 2. Load tested to support target concurrent sessions.",P1 - Should Have,Phase 2,REQ-046,Not Started,,
 REQ-062,NFR,Data Retention & Backup,Policies defined for Postgres backups and trace retention.,"1. Daily Postgres backups configured.
-2. Langfuse trace retention policy defined (e.g. 30 days).",P0 - Must Have,Phase 1,REQ-014,Not Started,,
+2. Langfuse trace retention policy defined (e.g. 30 days).",P0 - Must Have,Phase 1,REQ-014,Complete,Antigravity Agent,2026-09-20
 REQ-063,Evaluation,Trajectory Evaluator,"Evaluates agent trace for plan adherence, tool validity, and recovery steps.","1. Scripts compute plan adherence ratio.
 2. Tool call schema validity >= 95% on Track B.
 3. Track B task success rate computed.",P0 - Must Have,Phase 1,REQ-008,Complete,Antigravity Agent,2026-09-20

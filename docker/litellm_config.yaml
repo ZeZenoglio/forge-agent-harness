@@ -1,0 +1,39 @@
+model_list:
+  - model_name: default-agent
+    litellm_params:
+      model: ollama/qwen3.5:4b
+      api_base: http://host.docker.internal:11434
+      rpm: 120
+      tpm: 100000
+
+  - model_name: reasoning-large
+    litellm_params:
+      model: ollama/qwen2.5:14b
+      api_base: http://host.docker.internal:11434
+
+  - model_name: utility-small
+    litellm_params:
+      model: ollama/qwen2.5:1.5b
+      api_base: http://host.docker.internal:11434
+
+  - model_name: reviewer
+    litellm_params:
+      model: ollama/qwen2.5:14b
+      api_base: http://host.docker.internal:11434
+      temperature: 0.0
+
+  - model_name: summarizer
+    litellm_params:
+      model: ollama/qwen2.5:1.5b
+      api_base: http://host.docker.internal:11434
+
+router_settings:
+  routing_strategy: usage-based-routing
+  enable_pre_call_checks: true
+  fallbacks:
+    - default-agent: ["reasoning-large"]
+    - reviewer: ["reasoning-large"]
+
+general_settings:
+  master_key: sk-1234
+  store_model_in_db: true

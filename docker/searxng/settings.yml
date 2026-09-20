@@ -1,0 +1,35 @@
+use_default_settings: true
+
+general:
+  debug: false
+  instance_name: "JO Harness SearXNG Meta-Search"
+
+search:
+  safe_search: 0
+  autocomplete: ""
+  formats:
+    - html
+    - json
+
+server:
+  port: 8080
+  bind_address: "0.0.0.0"
+  secret_key: "forge_searxng_secret_key_development_only"
+  limiter: false
+  image_proxy: false
+
+engines:
+  - name: google
+    engine: google
+    shortcut: g
+    disabled: false
+
+  - name: bing
+    engine: bing
+    shortcut: b
+    disabled: false
+
+  - name: duckduckgo
+    engine: duckduckgo
+    shortcut: ddg
+    disabled: false
