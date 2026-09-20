@@ -27,3 +27,22 @@ Telemetry from LiteLLM and OpenHands runtime emits span timestamps to Langfuse f
   - Raw generation spans & tool traces: 30 days default.
   - Evaluation experiment benchmark datasets: Retained indefinitely for regression comparisons.
 - **Scrubbing**: Secrets and PII are redacted synchronously prior to persistence.
+
+---
+
+## 3. Concurrency Targets & Load Testing (REQ-061)
+
+### 3.1 Concurrency Sizing & Targets
+- **Target Concurrent User Sessions**: The platform supports a minimum of 20 concurrent active user sessions per worker node without request degradation or connection dropouts.
+- **Celery Worker Concurrency**: Managed via `CELERY_WORKER_CONCURRENCY` (default: 8 worker threads/processes per container).
+- **Horizontal Scaling**: Worker count scales horizontally via Celery (`docker-compose up --scale celery-worker=N` or Kubernetes HPA based on CPU/queue depth).
+- **Task Isolation**: Tasks run with late acknowledgment (`task_acks_late=True`) and unbuffered prefetch (`worker_prefetch_multiplier=1`) to prevent task starvation across worker pools.
+
+### 3.2 Verification & Load Testing
+- Automated load testing runner located at `scripts/load_test.py`.
+- Execution command:
+  ```bash
+  uv run python scripts/load_test.py --url http://localhost:8000 --concurrency 20 --total 100
+  ```
+- Acceptance criteria: 0 dropped sessions, >99% success rate, and p95 session roundtrip within acceptable limits under peak concurrent load.
+

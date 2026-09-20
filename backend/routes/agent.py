@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from fastapi.responses import StreamingResponse
@@ -21,6 +22,7 @@ from backend.services.streaming import StreamService
 
 router = APIRouter()
 stream_service = StreamService()
+_user_dep = Depends(get_current_user)
 
 # Holds asyncio.Events for sessions awaiting human approval (REQ-050).
 pending_approvals: dict[str, asyncio.Event] = {}
@@ -119,12 +121,31 @@ async def agent_task(
 async def run_agent(
     req: RunRequest,
     background_tasks: BackgroundTasks,
-    user_id: str = Depends(get_current_user),
-) -> dict[str, str]:
+    user_id: str = _user_dep,
+) -> dict[str, Any]:
     """Start an agent task and return the session ID for streaming."""
     session_id = str(uuid.uuid4())
     background_tasks.add_task(agent_task, session_id, req.task, user_id)
-    return {"session_id": session_id}
+    return {"data": {"session_id": session_id}, "session_id": session_id}
+
+
+@router.post("/cancel/{session_id}")
+async def cancel_agent_run(
+    session_id: str,
+    user_id: str = _user_dep,
+) -> dict[str, Any]:
+    """Cancel an ongoing agent run (REQ-033)."""
+    # If session is waiting for approval, dismiss it
+    if session_id in pending_approvals:
+        pending_approvals.pop(session_id, None)
+    # Emit cancel event to any active streams
+    cancel_event = AgentEvent(
+        seq=999,
+        event_type="cancelled",
+        content=f"Agent run {session_id} cancelled by user.",
+    )
+    await stream_service.emit_event(session_id, cancel_event.model_dump())
+    return {"data": {"cancelled": True, "session_id": session_id}}
 
 
 @router.get("/stream/{session_id}")
@@ -143,10 +164,10 @@ async def stream_agent(session_id: str) -> StreamingResponse:
 @router.post("/tasks/{session_id}/approve")
 async def approve_task(
     session_id: str,
-    user_id: str = Depends(get_current_user),
-) -> dict[str, str]:
+    user_id: str = _user_dep,
+) -> dict[str, Any]:
     """Signal approval for a pending HITL gate (REQ-050)."""
     if session_id in pending_approvals:
         pending_approvals[session_id].set()
-        return {"status": "approved"}
+        return {"data": {"status": "approved"}}
     raise HTTPException(status_code=404, detail="No pending approval for this session")
