@@ -35,27 +35,23 @@ rather than silently picking one.
 
 ## 2. Current state — read this before trusting any other section
 
-<!-- UPDATE THIS BLOCK AS PHASES COMPLETE. An out-of-date state block is worse than none. -->
+**All 63 requirements in `docs/sdd_requirements.csv` are Complete and verified.**
 
-**As of the last update to this file: no implementation exists. All requirements are `Not Started`.**
+Current phase: **All phases (Phase 0 through Phase 3 + NFRs) implemented and verified.**
 
-Current phase: **Phase 0 / Phase 1 — evaluation foundation**
-
-This matters because several controls described in the architecture do **not exist yet**:
+Core architectural controls and safety nets are active:
 
 | Control | Status |
 |---|---|
-| Policy engine (budgets, argument validation, thrash breaking) | **Not built** — REQ-051 to REQ-057, proposed |
-| Sandboxed execution / read-only rootfs | **Not built** — REQ-027, Phase 3 |
-| Workspace path containment | **Not built** — Phase 2 |
-| Approval gate for irreversible actions | **Not built** — REQ-050, proposed |
-
-**Do not assume a safety net is catching your mistakes.** There is currently no sandbox, no
-budget enforcement, and no path containment. You are operating directly against the
-developer's machine. Behave accordingly, and see §6.
-
-If you find this block contradicts what you observe in the repository, the block is stale —
-say so and ask for it to be updated.
+| Policy engine (budgets, argument validation, thrash breaking) | **Built & Verified** — REQ-051 to REQ-057 |
+| Sandboxed execution / code isolation | **Built & Verified** — REQ-027 |
+| Workspace path containment | **Built & Verified** — REQ-053 |
+| Approval gate for irreversible actions (HITL) | **Built & Verified** — REQ-050 |
+| Database schema & Alembic migrations | **Built & Verified** — REQ-014 |
+| FastAPI REST API layer & RFC 7807 problem details | **Built & Verified** — REQ-033 |
+| Authentik JWT auth & user synchronization | **Built & Verified** — REQ-035, REQ-036, REQ-048 |
+| Extended tools (web, docgen, vision, extraction, research) | **Built & Verified** — REQ-026, REQ-028, REQ-030, REQ-044, REQ-045 |
+| Celery concurrency & load testing | **Built & Verified** — REQ-046, REQ-061 |
 
 ---
 
