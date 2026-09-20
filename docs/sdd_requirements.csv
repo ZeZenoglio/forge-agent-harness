@@ -139,7 +139,7 @@ REQ-031,Tools - Extended,Email integration (Gmail connector),"Agent can read, se
 3. search_emails returns subject, sender, date, snippet for matching messages.
 4. read_email returns full body text.
 5. draft_email creates a draft in the user's Gmail (does not auto-send without approval).
-6. OAuth tokens are managed by Authentik and retrieved via its API.",P2 - Nice to Have,Phase 3,REQ-014; REQ-035; REQ-036,Not Started,,
+6. OAuth tokens are managed by Authentik and retrieved via its API.",P2 - Nice to Have,Phase 3,REQ-014; REQ-035; REQ-036,Complete,Antigravity Agent,2026-09-20
 REQ-032,Interoperability - MCP,Agent tools exposed as MCP server,"The agent's tool catalog is also served as an MCP server, allowing external MCP-compatible clients (IDEs, other agents) to invoke them.","1. An MCP server (FastMCP or custom) exposes agent tools following the MCP 2026-07 spec.
 2. Tools are discoverable via the MCP tools/list endpoint.
 3. External clients can call tools via JSON-RPC over stdio or HTTP/SSE.
@@ -191,7 +191,7 @@ REQ-041,Infrastructure - DevOps,Kubernetes-ready containerization,"Each service 
 2. Services communicate via Kubernetes service DNS names.
 3. Secrets are injected via Kubernetes Secrets or external secret managers.
 4. Horizontal pod autoscaling is configured for FastAPI workers.
-5. Readiness and liveness probes are defined for each service.",P2 - Nice to Have,Phase 3,REQ-040,Not Started,,
+5. Readiness and liveness probes are defined for each service.",P2 - Nice to Have,Phase 3,REQ-040,Complete,Antigravity Agent,2026-09-20
 REQ-042,Agent Core,SLM model selection (qwen3.5:4b default),"The default local SLM is qwen3.5:4b running on Ollama, selected for its best-in-class tool calling and reasoning in the ~4B parameter class.","1. qwen3.5:4b is pulled and available via Ollama.
 2. LiteLLM alias ""default-agent"" routes to ollama/qwen3.5:4b.
 3. Agent system prompt is optimized for qwen3.5's tool-calling template.
