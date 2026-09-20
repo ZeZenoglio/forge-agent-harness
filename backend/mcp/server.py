@@ -15,10 +15,13 @@ mcp = FastMCP("Forge MCP Server")
 WORKSPACE_ROOT = os.getenv("FORGE_WORKSPACE", "/tmp/forge_workspace")
 policy = PolicyEngine(workspace_root=WORKSPACE_ROOT)
 
+
 def _check_policy(tool_name: str, **kwargs: Any) -> None:
     """Helper to validate arguments before tool execution."""
     if not policy.validate_tool_args(tool_name, kwargs):
-        raise ValueError(f"PolicyEngine blocked execution of {tool_name} with provided arguments.")
+        raise ValueError(
+            f"PolicyEngine blocked execution of {tool_name} with provided arguments."
+        )
 
 
 @mcp.tool()

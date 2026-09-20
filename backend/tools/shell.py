@@ -10,7 +10,7 @@ def execute_shell(command: str, timeout: int = 30) -> str:
             capture_output=True,
             text=True,
             timeout=timeout,
-            check=False
+            check=False,
         )
         output = result.stdout
         if result.stderr:

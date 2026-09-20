@@ -10,13 +10,13 @@ def send_email(to_address: str, subject: str, body: str) -> str:
     smtp_host = os.getenv("SMTP_HOST", "localhost")
     smtp_port = int(os.getenv("SMTP_PORT", "1025"))
     from_address = os.getenv("SMTP_FROM", "agent@forge.local")
-    
+
     msg = EmailMessage()
     msg.set_content(body)
-    msg['Subject'] = subject
-    msg['From'] = from_address
-    msg['To'] = to_address
-    
+    msg["Subject"] = subject
+    msg["From"] = from_address
+    msg["To"] = to_address
+
     try:
         with smtplib.SMTP(smtp_host, smtp_port) as server:
             server.send_message(msg)

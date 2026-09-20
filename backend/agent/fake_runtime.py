@@ -13,7 +13,9 @@ class FakeRuntime(AgentRuntime):
     def __init__(self) -> None:
         self.seq_counter = 0
 
-    async def init_session(self, session_id: str, user_id: str = "anonymous_user") -> None:
+    async def init_session(
+        self, session_id: str, user_id: str = "anonymous_user"
+    ) -> None:
         self.seq_counter = 0
 
     async def step(self, session_id: str, input_event: AgentEvent) -> AgentEvent:
