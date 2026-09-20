@@ -8,13 +8,20 @@ class ApprovalRequiredException(Exception):
 
 
 class PolicyEngine:
-    """
-    Synchronous policy engine evaluating constraints before any tool is run.
-    Implements budget tracking, thrash breaking, PII scrubbing, and validation.
+    """Synchronous policy engine evaluating constraints before any tool is run.
+
+    Implements budget tracking (REQ-057), thrash breaking, PII scrubbing,
+    and argument validation.
     """
 
+    # Maximum tokens a single tool observation may contribute to context (REQ-057).
+    MAX_OBSERVATION_TOKENS: int = 2_000
+
     def __init__(
-        self, workspace_root: str, max_iterations: int = 30, max_tokens: int = 100000
+        self,
+        workspace_root: str = "/tmp/forge_workspace",
+        max_iterations: int = 30,
+        max_tokens: int = 100_000,
     ):
         self.workspace_root = Path(workspace_root).resolve()
         self.max_iterations = max_iterations
@@ -41,8 +48,20 @@ class PolicyEngine:
         self.token_counts[session_id] = 0
         self.action_history[session_id] = []
 
+    def record_tokens(self, session_id: str, token_count: int) -> None:
+        """Charge *token_count* tokens against the session budget (REQ-057).
+
+        Called after each model observation is appended to context.  The
+        caller is responsible for estimating token count (e.g. ``len(text) // 4``
+        as a conservative approximation when a tokeniser is unavailable).
+        """
+        self.token_counts[session_id] = (
+            self.token_counts.get(session_id, 0) + token_count
+        )
+        self.iteration_counts[session_id] = self.iteration_counts.get(session_id, 0) + 1
+
     def check_budget(self, session_id: str) -> bool:
-        """Abort if max iterations or token limits are exceeded."""
+        """Return False if max iterations or token limits are exceeded."""
         iters = self.iteration_counts.get(session_id, 0)
         tokens = self.token_counts.get(session_id, 0)
 

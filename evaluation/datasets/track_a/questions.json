@@ -1,0 +1,27 @@
+[
+  {
+    "id": "tqa-001",
+    "question": "What is the capital of France?",
+    "ground_truth": "Paris"
+  },
+  {
+    "id": "tqa-002",
+    "question": "Who wrote 'Pride and Prejudice'?",
+    "ground_truth": "Jane Austen"
+  },
+  {
+    "id": "tqa-003",
+    "question": "What programming language was Python named after?",
+    "ground_truth": "Monty Python"
+  },
+  {
+    "id": "tqa-004",
+    "question": "In what year did the Berlin Wall fall?",
+    "ground_truth": "1989"
+  },
+  {
+    "id": "tqa-005",
+    "question": "What is the chemical symbol for gold?",
+    "ground_truth": "Au"
+  }
+]
