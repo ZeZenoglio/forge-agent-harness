@@ -10,6 +10,14 @@ export default defineConfig({
         target: 'http://localhost:8000',
         changeOrigin: true,
       },
+      '/.well-known': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
+      '/a2a': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
     },
   },
 })
