@@ -20,10 +20,12 @@ class PolicyEngine:
         self.token_counts: dict[str, int] = {}
         self.action_history: dict[str, list[str]] = {}
         
-        # Simple secret regex for testing (e.g. AWS keys, JWTs)
+        # Common secret regex patterns (AWS keys, JWTs, generic secrets)
         self.secret_patterns = [
-            re.compile(r'(?i)(?:api_key|secret|token|password)[^a-z0-9]*[a-z0-9_]{16,}'),
-            re.compile(r'AKIA[0-9A-Z]{16}'),
+            re.compile(r'(?i)(?:api_key|secret|token|password|auth|bearer)[^a-z0-9]*[a-z0-9_]{16,}'),
+            re.compile(r'AKIA[0-9A-Z]{16}'), # AWS Access Key
+            re.compile(r'eyJ[a-zA-Z0-9_-]{5,}\.[a-zA-Z0-9_-]{5,}\.[a-zA-Z0-9_-]{5,}'), # JWT
+            re.compile(r'gh[pousr]_[A-Za-z0-9_]{36}'), # GitHub tokens
         ]
         
     def init_session(self, session_id: str) -> None:
@@ -78,3 +80,15 @@ class PolicyEngine:
                     return False
                     
         return True
+
+    def check_requires_approval(self, tool_name: str, arguments: dict[str, Any]) -> None:
+        """Raise ApprovalRequiredException if the tool call requires human intervention."""
+        # For Phase 2, any shell command with sudo requires approval
+        if tool_name == "execute_shell":
+            command = arguments.get("command", "")
+            if "sudo" in command:
+                raise ApprovalRequiredException(f"Command requires human approval: {command}")
+        
+        # We can expand this list (e.g., deleting files, sending emails)
+        if tool_name == "delete_file":
+            raise ApprovalRequiredException(f"Deleting file requires human approval: {arguments.get('path')}")

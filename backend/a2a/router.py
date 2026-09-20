@@ -1,10 +1,11 @@
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks, Depends
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
+from backend.dependencies import get_current_user
 from backend.routes.agent import agent_task
 from backend.services.streaming import StreamService
 
@@ -45,7 +46,7 @@ async def get_agent_card() -> JSONResponse:
     return JSONResponse(card)
 
 @a2a_router.post("/tasks/send")
-async def tasks_send(req: A2ATaskRequest, background_tasks: BackgroundTasks) -> A2ATaskResponse:
+async def tasks_send(req: A2ATaskRequest, background_tasks: BackgroundTasks, user_id: str = Depends(get_current_user)) -> A2ATaskResponse:
     if req.method != "submit_task":
         return A2ATaskResponse(id=req.id, result={"error": "Method not supported"})
     
@@ -53,7 +54,7 @@ async def tasks_send(req: A2ATaskRequest, background_tasks: BackgroundTasks) -> 
     session_id = str(uuid.uuid4())
     
     # Run the same background agent logic
-    background_tasks.add_task(agent_task, session_id, task_description)
+    background_tasks.add_task(agent_task, session_id, task_description, user_id)
     
     return A2ATaskResponse(
         id=req.id,

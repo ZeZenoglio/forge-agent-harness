@@ -9,7 +9,7 @@ class AgentRuntime(Protocol):
     The rest of the system depends ONLY on this protocol, never directly on OpenHands.
     """
 
-    async def init_session(self, session_id: str) -> None:
+    async def init_session(self, session_id: str, user_id: str = "anonymous_user") -> None:
         """Initialize a new agent session."""
         ...
 

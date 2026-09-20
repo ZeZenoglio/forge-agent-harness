@@ -168,7 +168,7 @@ REQ-036,Authentication,SSO via Authentik (Google/GitHub social login),"Authentik
 REQ-037,Authentication,Per-user tracking in Langfuse,"Every agent call is tagged with the authenticated user's ID in Langfuse, enabling per-user usage analytics.","1. Langfuse traces include user_id matching the application's user ID.
 2. Langfuse dashboard can filter traces by user.
 3. LiteLLM virtual keys (if used) include user metadata for attribution.
-4. Cost and token usage can be aggregated per user in Langfuse.",P0 - Must Have,Phase 2,REQ-004; REQ-005; REQ-035,Not Started,,
+4. Cost and token usage can be aggregated per user in Langfuse.",P0 - Must Have,Phase 2,REQ-004; REQ-005; REQ-035,Complete,Agent,
 REQ-038,Frontend,Chainlit prototype UI,"A Chainlit-based chat UI is mounted within or alongside the FastAPI app, supporting streaming, tool-call visibility, and artifact display. Auth is delegated to Authentik.","1. Chainlit UI is accessible at http://localhost:8000/chat (or similar mount path).
 2. User messages are sent to the agent and responses are streamed back in real-time.
 3. Tool calls are displayed as expandable steps within the conversation.
@@ -240,20 +240,20 @@ REQ-050,Agent Core,Human-in-the-loop tool approval,Certain irreversible or dange
 2. Approval event emitted to stream.
 3. Timeout defaults to deny after 5 mins.
 4. Persists across worker restart.
-5. Audit logged.",P0 - Must Have,Phase 2,REQ-017,Not Started,,
+5. Audit logged.",P0 - Must Have,Phase 2,REQ-017,Complete,Agent,
 REQ-051,Security,Policy Engine (Guardrails),A synchronous policy engine sits below the AgentRuntime to enforce deterministic guardrails.,"1. Policy engine runs synchronously.
 2. Enforces run budgets and thrash breaking.
 3. Validates tool arguments.
 4. Fails closed on violation.",P0 - Must Have,Phase 2,REQ-017,Complete,Antigravity Agent,2026-09-20
 REQ-052,Security,Secret Scrubbing & PII Redaction,All traces and logs are scrubbed of secrets and PII before being sent to observability platforms.,"1. Policy engine scrubs configured secrets.
 2. Redacts PII before sending to Langfuse.
-3. Fails closed if scrubber fails.",P0 - Must Have,Phase 2,REQ-051,Not Started,,
+3. Fails closed if scrubber fails.",P0 - Must Have,Phase 2,REQ-051,Complete,Agent,
 REQ-053,Security,Workspace Containment & Shell Policy,File operations are strictly confined to the workspace via realpath checks. Shell commands are restricted.,"1. File operations use realpath to prevent path traversal.
 2. Shell commands checked against allowlist.
 3. Read-only rootfs in container.
-4. Dropped Linux capabilities.",P0 - Must Have,Phase 2,REQ-023; REQ-024; REQ-025,Complete,Antigravity Agent,2026-09-20
+4. Dropped Linux capabilities.",P0 - Must Have,Phase 2,REQ-023; REQ-024; REQ-025,Complete,Agent,2026-09-20
 REQ-054,Security,Egress & SSRF Protection,Outbound network access is restricted and SSRF protections applied to fetch_url.,"1. fetch_url blocks local/private IP ranges.
-2. Egress policy blocks non-approved outbound connections from the sandbox.",P1 - Should Have,Phase 2,REQ-026,Complete,Antigravity Agent,2026-09-20
+2. Egress policy blocks non-approved outbound connections from the sandbox.",P1 - Should Have,Phase 2,REQ-026,Complete,Agent,2026-09-20
 REQ-055,Security,Threat Model & Dependency Scanning,"A formal threat model exists, and CI pipelines include dependency scanning (pip-audit).","1. Threat model documented in docs.
 2. CI runs pip-audit on PRs.
 3. Container image scanning enabled.",P0 - Must Have,Phase 1,None,Not Started,,
