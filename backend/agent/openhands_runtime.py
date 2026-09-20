@@ -6,7 +6,7 @@ from backend.tools.shell import execute_shell
 from backend.tools.web import fetch_url
 
 from .events import AgentEvent
-from .policies import ApprovalRequiredException, PolicyEngine
+from .policies import PolicyEngine
 from .runtime import AgentRuntime
 
 # This is the ONLY file allowed to import openhands.*
@@ -22,7 +22,8 @@ class OpenHandsRuntime(AgentRuntime):
         self.policy_engine = policy_engine
         self.seq_counter = 0
 
-    async def init_session(self, session_id: str) -> None:
+    async def init_session(self, session_id: str, user_id: str = "anonymous_user") -> None:
+        # Pass user_id to policy engine or Langfuse setup here if needed
         self.policy_engine.init_session(session_id)
 
     async def step(self, session_id: str, input_event: AgentEvent) -> AgentEvent:
@@ -48,6 +49,8 @@ class OpenHandsRuntime(AgentRuntime):
         if not self.policy_engine.validate_tool_args(tool_name, arguments):
             return {"error": "Tool arguments blocked by PolicyEngine due to violation"}
             
+        self.policy_engine.check_requires_approval(tool_name, arguments)
+            
         try:
             if tool_name == "read_file":
                 return read_file(arguments["path"])
@@ -68,8 +71,6 @@ class OpenHandsRuntime(AgentRuntime):
                 )
             else:
                 return {"error": f"Unknown tool: {tool_name}"}
-        except ApprovalRequiredException:
-            return {"error": "Human approval required for this action."}
         except Exception as e:  # noqa: BLE001
             return {"error": f"Tool execution failed: {e!s}"}
             

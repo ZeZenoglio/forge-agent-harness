@@ -14,8 +14,9 @@ def test_a2a_agent_card():
     assert "delegate_task" in card["capabilities"]
     assert "tasks_send" in card["endpoints"]
 
+@patch("backend.a2a.router.agent_task", new_callable=AsyncMock)
 @patch("backend.routes.agent.stream_service.emit_event", new_callable=AsyncMock)
-def test_a2a_task_send(mock_emit):
+def test_a2a_task_send(mock_emit, mock_agent_task):
     payload = {
         "jsonrpc": "2.0",
         "id": "123",
