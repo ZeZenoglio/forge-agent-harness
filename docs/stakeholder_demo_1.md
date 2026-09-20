@@ -7,7 +7,7 @@
 ## 🛠️ Prep Work (Before the meeting starts)
 1. **Start the Database & SMTP Mock:**
    ```bash
-   docker-compose up -d postgres mailpit
+   docker-compose -f docker/docker-compose.yml up -d postgres mailpit
    ```
 2. **Start the API Server:**
    ```bash
