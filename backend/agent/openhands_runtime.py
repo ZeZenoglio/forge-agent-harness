@@ -1,5 +1,6 @@
 from typing import Any
 
+from backend.tools.delegation import delegate_task
 from backend.tools.file import edit_file, list_directory, read_file, write_file
 from backend.tools.shell import execute_shell
 from backend.tools.web import fetch_url
@@ -60,6 +61,11 @@ class OpenHandsRuntime(AgentRuntime):
                 return execute_shell(arguments.get("command", ""))
             elif tool_name == "fetch_url":
                 return fetch_url(arguments.get("url", ""))
+            elif tool_name == "delegate_task":
+                return await delegate_task(
+                    task_description=arguments.get("task_description", ""),
+                    model_alias=arguments.get("model_alias", "default-agent")
+                )
             else:
                 return {"error": f"Unknown tool: {tool_name}"}
         except ApprovalRequiredException:
@@ -69,7 +75,6 @@ class OpenHandsRuntime(AgentRuntime):
             
     async def close(self, session_id: str) -> None:
         """Close the session."""
-        pass
             
     def _build_event(self, event_type: str, content: str) -> AgentEvent:
         self.seq_counter += 1
