@@ -173,7 +173,7 @@ REQ-038,Frontend,Chainlit prototype UI,"A Chainlit-based chat UI is mounted with
 2. User messages are sent to the agent and responses are streamed back in real-time.
 3. Tool calls are displayed as expandable steps within the conversation.
 4. Artifacts are displayed inline or as downloadable links.
-5. Authentication is delegated to Authentik; Chainlit receives authenticated user context from FastAPI via header auth.",P0 - Must Have,Phase 2,REQ-033; REQ-035,Not Started,,
+5. Authentication is delegated to Authentik; Chainlit receives authenticated user context from FastAPI via header auth.",P0 - Must Have,Phase 2,REQ-033; REQ-035,Complete,Antigravity Agent,2026-09-20
 REQ-039,Frontend,Production UI (customized Open WebUI or React),"For production, either customize Open WebUI (FastAPI-native, Ollama-integrated, built-in Pipes/Actions extensibility) or build a custom React UI if deeper control is needed. Both options consume the same FastAPI API.","1. Open WebUI is deployed alongside FastAPI and configured to proxy agent requests through our API.
 2. Open WebUI's Pipes/Actions system is used to wire in our agent tools and streaming.
 3. Chat interface supports streaming with typed event rendering.

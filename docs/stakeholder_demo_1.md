@@ -9,14 +9,19 @@
    ```bash
    docker-compose -f docker/docker-compose.yml up -d postgres mailpit
    ```
-2. **Start the API Server:**
+2. **Build the frontend** *(only needed once, or after UI changes):*
+   ```bash
+   cd frontend && npm run build && cd ..
+   ```
+3. **Start the API Server** *(also serves the React UI at `/`):*
    ```bash
    uv run uvicorn backend.main:app --reload
    ```
-3. **Open Browser Tabs:**
+4. **Open Browser Tabs:**
    - Tab 1: `docs/architecture.html` (The Architecture Diagram)
-   - Tab 2: `http://localhost:8000/docs` (FastAPI Swagger UI)
-   - Tab 3: `http://localhost:8025` (Mailpit Web UI)
+   - Tab 2: `http://localhost:8000` (Forge UI — React Chat Interface)
+   - Tab 3: `http://localhost:8000/api/docs` (FastAPI Swagger UI)
+   - Tab 4: `http://localhost:8025` (Mailpit Web UI)
 
 ---
 
