@@ -46,12 +46,16 @@ async def agent_task(
     await runtime.init_session(session_id, user_id=user_id)
     seq = 0
 
-    async def emit(event_type: str, content: str, tool_name: str | None = None) -> AgentEvent:
+    async def emit(
+        event_type: str, content: str, tool_name: str | None = None
+    ) -> AgentEvent:
         nonlocal seq
         meta: dict[str, object] = {}
         if tool_name:
             meta["tool_name"] = tool_name
-        event = AgentEvent(seq=seq, event_type=event_type, content=content, metadata=meta)
+        event = AgentEvent(
+            seq=seq, event_type=event_type, content=content, metadata=meta
+        )
         await stream_service.emit_event(session_id, event.model_dump())
         seq += 1
         return event

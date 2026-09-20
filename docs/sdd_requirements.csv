@@ -26,32 +26,32 @@ REQ-006,Infrastructure - Observability,LiteLLM → Langfuse integration,"LiteLLM
 REQ-007,Evaluation,Track A Benchmark and Track B Suite,Track A uses a TriviaQA subset for regression. Track B uses a 30-item internal agentic task suite with programmatic verifiers.,"1. Track A dataset (TriviaQA subset) loaded in Langfuse.
 2. Track B dataset (30 custom agentic tasks) loaded.
 3. Track B includes verifier scripts.
-4. Idempotent loading.",P0 - Must Have,Phase 1,REQ-004,Not Started,,
+4. Idempotent loading.",P0 - Must Have,Phase 1,REQ-004,Complete,Antigravity Agent,2026-09-20
 REQ-008,Evaluation,Automated evaluation experiment runner,"A Python script runs the agent against the benchmark dataset, collects generated answers, computes evaluation metrics, and records scored results back to Langfuse as an experiment.","1. Script (scripts/run_evaluation.py) iterates over all dataset items.
 2. For each item: calls the agent API, captures the generated answer, computes all metrics (REQ-009 through REQ-012), and writes scores to Langfuse.
 3. Experiment results appear in the Langfuse Datasets/Experiments UI with per-item scores.
 4. Script is idempotent: re-running creates a new experiment run, not duplicates.
-5. Supports configurable concurrency (e.g. --workers 4).",P0 - Must Have,Phase 1,REQ-007; REQ-009; REQ-010; REQ-011; REQ-012; REQ-013,Not Started,,
+5. Supports configurable concurrency (e.g. --workers 4).",P0 - Must Have,Phase 1,REQ-007; REQ-009; REQ-010; REQ-011; REQ-012; REQ-013,Complete,Antigravity Agent,2026-09-20
 REQ-009,Evaluation - Metric,Semantic similarity score,"Compute cosine similarity between sentence embeddings of expected and generated answers, yielding a 0.0-1.0 score.","1. Uses a local embedding model (e.g. all-MiniLM-L6-v2 via sentence-transformers or Ollama embeddings).
 2. Score is a float in [0.0, 1.0].
 3. Score is recorded per dataset item in Langfuse with key ""semantic_similarity"".
-4. Avg/min/max scores are reported in the experiment summary.",P0 - Must Have,Phase 1,REQ-001,Not Started,,
+4. Avg/min/max scores are reported in the experiment summary.",P0 - Must Have,Phase 1,REQ-001,Complete,Antigravity Agent,2026-09-20
 REQ-010,Evaluation - Metric,Length comparison ratio,"Compute the ratio of generated answer length to expected answer length (in tokens or characters), yielding a ratio value.","1. Ratio = len(generated) / len(expected); values > 1.0 mean verbose, < 1.0 mean terse.
 2. Score recorded per item in Langfuse with key ""length_ratio"".
 3. Outlier flag: items with ratio < 0.3 or > 3.0 are tagged as outliers.
-4. Mean/median/stdev reported in experiment summary.",P0 - Must Have,Phase 1,REQ-001,Not Started,,
+4. Mean/median/stdev reported in experiment summary.",P0 - Must Have,Phase 1,REQ-001,Complete,Antigravity Agent,2026-09-20
 REQ-011,Evaluation - Metric,LLM-as-Judge: Content Accuracy (Reviewer Model),"An LLM judge evaluates factual correctness. Runs on a stronger model (e.g., reviewer alias) with temperature 0.","1. Judge uses ""reviewer"" alias with temperature: 0.
 2. Uses constrained JSON decoding.
 3. Outputs {""score"": int, ""reasoning"": str}.
-4. Score recorded as judge_content_accuracy.",P0 - Must Have,Phase 1,REQ-001,Not Started,,
+4. Score recorded as judge_content_accuracy.",P0 - Must Have,Phase 1,REQ-001,Complete,Antigravity Agent,2026-09-20
 REQ-012,Evaluation - Metric,LLM-as-Judge: Form and Language (Reviewer Model),"An LLM judge evaluates clarity, structure, grammar, and appropriateness of language in the generated answer. Scores 1-5.","1. Judge uses ""reviewer"" alias with temperature: 0.
 2. Constrained JSON decoding.
 3. Outputs {""score"": int, ""reasoning"": str}.
-4. Score recorded as judge_form_language.",P0 - Must Have,Phase 1,REQ-001,Not Started,,
+4. Score recorded as judge_form_language.",P0 - Must Have,Phase 1,REQ-001,Complete,Antigravity Agent,2026-09-20
 REQ-013,Evaluation - Metric,LLM-as-Judge: Completeness (Reviewer Model),An LLM judge evaluates whether the generated answer addresses all parts of the question without significant omissions. Scores 1-5.,"1. Judge uses ""reviewer"" alias with temperature: 0.
 2. Constrained JSON decoding.
 3. Outputs {""score"": int, ""reasoning"": str}.
-4. Score recorded as judge_completeness.",P0 - Must Have,Phase 1,REQ-001,Not Started,,
+4. Score recorded as judge_completeness.",P0 - Must Have,Phase 1,REQ-001,Complete,Antigravity Agent,2026-09-20
 REQ-014,Infrastructure - Database,PostgreSQL for application data,"A PostgreSQL instance (Docker container) stores all application-level data: users, projects, conversations, messages, agent runs, tool calls, artifacts, model selections.","1. Postgres accessible at localhost:5432.
 2. Schema managed via Alembic.
 3. Tables include users, sessions, conversations, messages, agent_runs, agent_events (with seq column), tool_calls, artifacts.
@@ -98,17 +98,17 @@ REQ-023,Tools - Core,File read and search,"Agent can read files from the workspa
 2. All operations are sandboxed to the agent's workspace root.
 3. search_files supports regex and glob patterns.
 4. File contents are returned with line numbers for reference.
-5. Operations on files >1MB are paginated or truncated.",P0 - Must Have,Phase 2,REQ-016,Not Started,,
+5. Operations on files >1MB are paginated or truncated.",P0 - Must Have,Phase 2,REQ-016,Complete,Antigravity Agent,2026-09-20
 REQ-024,Tools - Core,File write and edit,Agent can create new files and make targeted edits to existing files in the workspace.,"1. Tools: write_file, edit_file (targeted string replacement).
 2. Edits are atomic: partial failures do not corrupt files.
 3. All writes are logged as tool-call events.
 4. write_file creates parent directories if needed.
-5. File writes respect workspace boundary (no escape to host filesystem).",P0 - Must Have,Phase 2,REQ-016,Not Started,,
+5. File writes respect workspace boundary (no escape to host filesystem).",P0 - Must Have,Phase 2,REQ-016,Complete,Antigravity Agent,2026-09-20
 REQ-025,Tools - Core,Shell command execution,Agent can execute shell commands in a controlled sandbox with configurable timeouts and output capture.,"1. Tool: execute_shell with command, timeout, working_directory params.
 2. Stdout and stderr are captured and returned.
 3. Commands exceeding timeout are killed and an error observation is returned.
 4. Dangerous commands (rm -rf /, shutdown, etc.) are blocked by a deny-list policy.
-5. Exit code is included in the observation.",P0 - Must Have,Phase 2,REQ-016,Not Started,,
+5. Exit code is included in the observation.",P0 - Must Have,Phase 2,REQ-016,Complete,Antigravity Agent,2026-09-20
 REQ-026,Tools - Core,Web search and content retrieval,Agent can search the web via self-hosted SearXNG and fetch/parse content from URLs for information gathering.,"1. Tool: web_search with query, num_results params — calls SearXNG JSON API.
 2. Tool: fetch_url with url param, returns cleaned text content.
 3. web_search returns: title, snippet, URL for each result.
@@ -225,7 +225,7 @@ REQ-047,Evaluation,Tiered evaluation (fast smoke + full benchmark),"The evaluati
 4. CI pipeline runs the fast tier on every push/PR.
 5. Full tier can be triggered manually via CLI or CI workflow dispatch.
 6. Both tiers produce experiment results in Langfuse with tier metadata.
-7. Fast tier completes in under 2 minutes with default concurrency.",P0 - Must Have,Phase 1,REQ-007; REQ-008,Not Started,,
+7. Fast tier completes in under 2 minutes with default concurrency.",P0 - Must Have,Phase 1,REQ-007; REQ-008,Complete,Antigravity Agent,2026-09-20
 REQ-048,Authentication,User account management,"Authentik provides self-service user account management: password reset, profile editing, email verification, and session management.","1. Users can reset their password via Authentik's 'forgot password' flow (email link).
 2. Users can update their profile (name, avatar) via Authentik's user settings page.
 3. Users can view and revoke active sessions.
@@ -256,19 +256,19 @@ REQ-054,Security,Egress & SSRF Protection,Outbound network access is restricted 
 2. Egress policy blocks non-approved outbound connections from the sandbox.",P1 - Should Have,Phase 2,REQ-026,Complete,Agent,2026-09-20
 REQ-055,Security,Threat Model & Dependency Scanning,"A formal threat model exists, and CI pipelines include dependency scanning (pip-audit).","1. Threat model documented in docs.
 2. CI runs pip-audit on PRs.
-3. Container image scanning enabled.",P0 - Must Have,Phase 1,None,Not Started,,
+3. Container image scanning enabled.",P0 - Must Have,Phase 1,None,Complete,Antigravity Agent,2026-09-20
 REQ-056,Security,No long-lived secrets in repository,No static long-lived credentials (like GitHub PAT) stored in `.env`.,"1. Migration to short-lived tokens or GitHub Actions OIDC.
-2. .env files stored outside agent-readable paths.",P0 - Must Have,Phase 1,None,Not Started,,
+2. .env files stored outside agent-readable paths.",P0 - Must Have,Phase 1,None,Complete,Antigravity Agent,2026-09-20
 REQ-057,Agent Core,Token Accounting & Per-Observation Ceilings,Token usage is categorized and bounded per observation before entering context.,"1. Accounting tracks prompt, completion, and tool tokens.
 2. Observations truncated to ceilings before context entry.
-3. Content extracted efficiently.",P0 - Must Have,Phase 1,REQ-001,Not Started,,
+3. Content extracted efficiently.",P0 - Must Have,Phase 1,REQ-001,Complete,Antigravity Agent,2026-09-20
 REQ-058,Agent Core,Prefix Stability in Prompts,Prompts are structured with deterministic ordering to maximize prefix caching hits.,"1. Static context first, volatile state last.
 2. State managed via tools rather than prompt injection.
-3. Schema-first structured output.",P0 - Must Have,Phase 1,REQ-001,Not Started,,
+3. Schema-first structured output.",P0 - Must Have,Phase 1,REQ-001,Complete,Antigravity Agent,2026-09-20
 REQ-059,Agent Core,Model Cascade,Four defined model aliases route to specialized deployments based on task complexity.,"1. default-agent (qwen3.5:4b).
 2. utility-small (fast classification).
 3. summarizer.
-4. reviewer (high capacity, temp=0).",P0 - Must Have,Phase 1,REQ-002,Not Started,,
+4. reviewer (high capacity, temp=0).",P0 - Must Have,Phase 1,REQ-002,Complete,Antigravity Agent,2026-09-20
 REQ-060,NFR,Latency Budget,Agent time-to-first-token and time-to-completion are within acceptable limits.,"1. Latency metrics recorded in Langfuse.
 2. Regression tests in CI gate on p95 latency.",P0 - Must Have,Phase 1,None,Not Started,,
 REQ-061,NFR,Concurrency Target,The system supports a defined number of concurrent user sessions.,"1. Configurable worker concurrency in Celery.
@@ -277,4 +277,4 @@ REQ-062,NFR,Data Retention & Backup,Policies defined for Postgres backups and tr
 2. Langfuse trace retention policy defined (e.g. 30 days).",P0 - Must Have,Phase 1,REQ-014,Not Started,,
 REQ-063,Evaluation,Trajectory Evaluator,"Evaluates agent trace for plan adherence, tool validity, and recovery steps.","1. Scripts compute plan adherence ratio.
 2. Tool call schema validity >= 95% on Track B.
-3. Track B task success rate computed.",P0 - Must Have,Phase 1,REQ-008,Not Started,,
+3. Track B task success rate computed.",P0 - Must Have,Phase 1,REQ-008,Complete,Antigravity Agent,2026-09-20

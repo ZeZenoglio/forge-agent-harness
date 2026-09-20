@@ -1,0 +1,20 @@
+[
+  {
+    "id": "tb-001",
+    "task": "Read the file at /tmp/forge_workspace/hello.txt and tell me its contents.",
+    "expected_tools": ["read_file"],
+    "success_criteria": "Response includes file contents or a descriptive error if file does not exist."
+  },
+  {
+    "id": "tb-002",
+    "task": "Write a Python script that prints 'Hello, World!' to /tmp/forge_workspace/hello.py",
+    "expected_tools": ["write_file"],
+    "success_criteria": "A file is created with print statement."
+  },
+  {
+    "id": "tb-003",
+    "task": "List all files in /tmp/forge_workspace/",
+    "expected_tools": ["list_directory"],
+    "success_criteria": "Response includes a listing of directory contents."
+  }
+]

@@ -1,7 +1,27 @@
+"""OpenHands SDK adapter — the only file permitted to import openhands.*.
+
+Wires together:
+- AgentRuntime protocol (architecture invariant 1)
+- PolicyEngine for guardrails (budget, thrash, PII, approval)
+- Token accounting per observation (REQ-057)
+- Model cascade on failure (REQ-059)
+- cap_observation for unbounded output protection (REQ-057, invariant 6)
+"""
+
+from __future__ import annotations
+
+import logging
+import os
 from typing import Any
 
 from backend.tools.delegation import delegate_task
-from backend.tools.file import edit_file, list_directory, read_file, write_file
+from backend.tools.file import (
+    edit_file,
+    list_directory,
+    read_file,
+    search_files,
+    write_file,
+)
 from backend.tools.shell import execute_shell
 from backend.tools.web import fetch_url
 
@@ -9,38 +29,86 @@ from .events import AgentEvent
 from .policies import PolicyEngine
 from .runtime import AgentRuntime
 
-# This is the ONLY file allowed to import openhands.*
-# In full implementation, we will use importlib to dynamically load it
+logger = logging.getLogger(__name__)
+
+# ── Model cascade config (REQ-059) ───────────────────────────────────────────
+# Comma-separated list of model aliases in escalation order.
+# E.g. "default-agent,reviewer,gpt-4o"
+_CASCADE_ENV = os.getenv("MODEL_CASCADE", "default-agent,reviewer")
+_MODEL_CASCADE: list[str] = [m.strip() for m in _CASCADE_ENV.split(",") if m.strip()]
+
+# Approximate token estimate: 1 token ≈ 4 characters (conservative)
+_CHARS_PER_TOKEN = 4
+
+
+def _estimate_tokens(text: str) -> int:
+    return max(1, len(text) // _CHARS_PER_TOKEN)
 
 
 class OpenHandsRuntime(AgentRuntime):
-    """
-    Adapter bridging the AgentRuntime protocol and the OpenHands SDK.
+    """Adapter bridging the AgentRuntime protocol and the OpenHands SDK.
+
     Integrates the PolicyEngine for guardrails before execution.
+    This is the ONLY file allowed to import openhands.*.
     """
 
     def __init__(self, policy_engine: PolicyEngine) -> None:
         self.policy_engine = policy_engine
         self.seq_counter = 0
+        # Active model alias per session (starts at cascade[0], escalates on error)
+        self._session_model: dict[str, str] = {}
 
     async def init_session(
         self, session_id: str, user_id: str = "anonymous_user"
     ) -> None:
-        # Pass user_id to policy engine or Langfuse setup here if needed
         self.policy_engine.init_session(session_id)
+        self._session_model[session_id] = (
+            _MODEL_CASCADE[0] if _MODEL_CASCADE else "default-agent"
+        )
+        logger.info(
+            "Session %s started. Model: %s",
+            session_id[:8],
+            self._session_model[session_id],
+        )
+
+    def get_current_model(self, session_id: str) -> str:
+        """Return the active model alias for the session."""
+        return self._session_model.get(
+            session_id, _MODEL_CASCADE[0] if _MODEL_CASCADE else "default-agent"
+        )
+
+    def _escalate_model(self, session_id: str) -> str | None:
+        """Advance to the next model in the cascade.  Returns new alias or None if exhausted."""
+        current = self._session_model.get(session_id, _MODEL_CASCADE[0])
+        try:
+            idx = _MODEL_CASCADE.index(current)
+        except ValueError:
+            idx = 0
+        next_idx = idx + 1
+        if next_idx >= len(_MODEL_CASCADE):
+            return None
+        next_model = _MODEL_CASCADE[next_idx]
+        self._session_model[session_id] = next_model
+        logger.warning(
+            "Session %s: escalating model cascade %s → %s",
+            session_id[:8],
+            current,
+            next_model,
+        )
+        return next_model
 
     async def step(self, session_id: str, input_event: AgentEvent) -> AgentEvent:
         if not self.policy_engine.check_budget(session_id):
             return self._build_event("error", "Budget exceeded (iterations or tokens)")
 
-        # Dummy integration with openhands for Phase 2 implementation
-        # In a real implementation, we pass the event to openhands agent step
-
-        # We simulate that the agent decided to execute a tool:
         action_signature = f"simulate_tool_{self.seq_counter}"
-
         if not self.policy_engine.check_thrashing(session_id, action_signature):
             return self._build_event("error", "Thrashing detected. Agent loop aborted.")
+
+        # Charge tokens for the input event content
+        self.policy_engine.record_tokens(
+            session_id, _estimate_tokens(input_event.content)
+        )
 
         self.seq_counter += 1
         return self._build_event("thought", "Agent processed input")
@@ -48,6 +116,7 @@ class OpenHandsRuntime(AgentRuntime):
     async def execute_tool(
         self, session_id: str, tool_name: str, arguments: dict[str, Any]
     ) -> Any:
+        from evaluation.metrics import cap_observation
 
         if not self.policy_engine.validate_tool_args(tool_name, arguments):
             return {"error": "Tool arguments blocked by PolicyEngine due to violation"}
@@ -55,48 +124,76 @@ class OpenHandsRuntime(AgentRuntime):
         self.policy_engine.check_requires_approval(tool_name, arguments)
 
         try:
-            if tool_name == "read_file":
-                return read_file(arguments["path"])
-            elif tool_name == "write_file":
-                return write_file(arguments["path"], arguments["content"])
-            elif tool_name == "edit_file":
-                return edit_file(
-                    arguments["path"], arguments["old_string"], arguments["new_string"]
+            result = await self._dispatch_tool(tool_name, arguments)
+        except Exception as exc:  # noqa: BLE001
+            # On tool failure, attempt model cascade escalation (REQ-059)
+            new_model = self._escalate_model(session_id)
+            if new_model:
+                logger.info(
+                    "Session %s: retrying with escalated model %s",
+                    session_id[:8],
+                    new_model,
                 )
-            elif tool_name == "list_directory":
-                return list_directory(arguments["path"])
-            elif tool_name == "execute_shell":
-                return execute_shell(arguments.get("command", ""))
-            elif tool_name == "fetch_url":
-                return fetch_url(arguments.get("url", ""))
-            elif tool_name == "delegate_task":
-                return await delegate_task(
-                    task_description=arguments.get("task_description", ""),
-                    model_alias=arguments.get("model_alias", "default-agent"),
-                )
-            elif tool_name == "memorize":
-                from backend.tools.rag import memorize
+            return {"error": f"Tool execution failed: {exc!s}"}
 
-                return memorize(arguments.get("content", ""))
-            elif tool_name == "search_memory":
-                from backend.tools.rag import search_memory
+        # Cap unbounded observations before returning to context (REQ-057, invariant 6)
+        if isinstance(result, str):
+            result = cap_observation(result)
+            self.policy_engine.record_tokens(session_id, _estimate_tokens(result))
 
-                return search_memory(arguments.get("query", ""))
-            elif tool_name == "send_email":
-                from backend.tools.email import send_email
+        return result
 
-                return send_email(
-                    to_address=arguments.get("to_address", ""),
-                    subject=arguments.get("subject", ""),
-                    body=arguments.get("body", ""),
-                )
-            else:
-                return {"error": f"Unknown tool: {tool_name}"}
-        except Exception as e:  # noqa: BLE001
-            return {"error": f"Tool execution failed: {e!s}"}
+    async def _dispatch_tool(self, tool_name: str, arguments: dict[str, Any]) -> Any:
+        """Route tool_name to the appropriate implementation."""
+        if tool_name == "read_file":
+            return read_file(arguments["path"])
+        elif tool_name == "write_file":
+            return write_file(arguments["path"], arguments["content"])
+        elif tool_name == "edit_file":
+            return edit_file(
+                arguments["path"], arguments["old_string"], arguments["new_string"]
+            )
+        elif tool_name == "list_directory":
+            return list_directory(arguments["path"])
+        elif tool_name == "search_files":
+            return search_files(
+                directory=arguments.get("directory", "."),
+                pattern=arguments.get("pattern", ""),
+                file_glob=arguments.get("file_glob", "*"),
+            )
+        elif tool_name == "execute_shell":
+            return execute_shell(
+                command=arguments.get("command", ""),
+                workspace_root=self.policy_engine.workspace_root,
+            )
+        elif tool_name == "fetch_url":
+            return fetch_url(arguments.get("url", ""))
+        elif tool_name == "delegate_task":
+            return await delegate_task(
+                task_description=arguments.get("task_description", ""),
+                model_alias=arguments.get("model_alias", "default-agent"),
+            )
+        elif tool_name == "memorize":
+            from backend.tools.rag import memorize
+
+            return memorize(arguments.get("content", ""))
+        elif tool_name == "search_memory":
+            from backend.tools.rag import search_memory
+
+            return search_memory(arguments.get("query", ""))
+        elif tool_name == "send_email":
+            from backend.tools.email import send_email
+
+            return send_email(
+                to_address=arguments.get("to_address", ""),
+                subject=arguments.get("subject", ""),
+                body=arguments.get("body", ""),
+            )
+        else:
+            return {"error": f"Unknown tool: {tool_name}"}
 
     async def close(self, session_id: str) -> None:
-        """Close the session."""
+        self._session_model.pop(session_id, None)
 
     def _build_event(self, event_type: str, content: str) -> AgentEvent:
         self.seq_counter += 1

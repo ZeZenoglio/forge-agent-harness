@@ -42,3 +42,14 @@ target-version = "py313"
 [tool.mypy]
 python_version = "3.13"
 strict = true
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = "-ra -q"
+testpaths = ["tests"]
+markers = [
+    "smoke: Fast smoke test suite for CI (<2 min)",
+    "unit: Isolated unit tests (no network, no LLM)",
+    "integration: Integration tests requiring compose stack",
+    "eval: Evaluation and benchmark tests",
+]
