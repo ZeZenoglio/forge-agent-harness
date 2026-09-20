@@ -1,21 +1,19 @@
 import os
 from typing import Any
 
-from mcp.server.mcpserver import MCPServer
+from fastmcp import FastMCP
 
 from backend.agent.policies import PolicyEngine
 from backend.tools.file import edit_file, list_directory, read_file, write_file
 from backend.tools.shell import execute_shell
 from backend.tools.web import fetch_url
 
-# Initialize MCP Server
-mcp = MCPServer("Forge MCP Server")
+# Initialize FastMCP Server
+mcp = FastMCP("Forge MCP Server")
 
 # Instantiate Policy Engine for the MCP session
-# In a real scenario, workspace root should come from config
 WORKSPACE_ROOT = os.getenv("FORGE_WORKSPACE", "/tmp/forge_workspace")
 policy = PolicyEngine(workspace_root=WORKSPACE_ROOT)
-
 
 def _check_policy(tool_name: str, **kwargs: Any) -> None:
     """Helper to validate arguments before tool execution."""
@@ -66,5 +64,5 @@ def mcp_fetch_url(url: str) -> str:
 
 
 if __name__ == "__main__":
-    # Run the MCP server over stdio
+    # FastMCP uses .run() internally which handles stdio and sse transparently.
     mcp.run(transport="stdio")
