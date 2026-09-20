@@ -124,7 +124,9 @@ class OpenHandsRuntime(AgentRuntime):
         self.policy_engine.check_requires_approval(tool_name, arguments)
 
         try:
-            result = await self._dispatch_tool(tool_name, arguments)
+            result = await self._dispatch_tool(
+                tool_name, arguments, session_id=session_id
+            )
         except Exception as exc:  # noqa: BLE001
             # On tool failure, attempt model cascade escalation (REQ-059)
             new_model = self._escalate_model(session_id)
@@ -143,7 +145,9 @@ class OpenHandsRuntime(AgentRuntime):
 
         return result
 
-    async def _dispatch_tool(self, tool_name: str, arguments: dict[str, Any]) -> Any:
+    async def _dispatch_tool(
+        self, tool_name: str, arguments: dict[str, Any], session_id: str = ""
+    ) -> Any:
         """Route tool_name to the appropriate implementation."""
         if tool_name == "read_file":
             return read_file(arguments["path"])
@@ -188,6 +192,58 @@ class OpenHandsRuntime(AgentRuntime):
                 to_address=arguments.get("to_address", ""),
                 subject=arguments.get("subject", ""),
                 body=arguments.get("body", ""),
+            )
+        elif tool_name == "research_topic":
+            from backend.tools.research import research_topic
+
+            return research_topic(
+                query=arguments.get("query", ""),
+                depth=arguments.get("depth", "shallow"),
+                conversation_id=session_id,
+            )
+        elif tool_name == "web_search":
+            from backend.tools.web import web_search
+
+            return web_search(
+                query=arguments.get("query", ""),
+                num_results=arguments.get("num_results", 5),
+            )
+        elif tool_name == "execute_code":
+            from backend.tools.code import execute_code
+
+            return execute_code(
+                code=arguments.get("code", ""),
+                language=arguments.get("language", "python"),
+            )
+        elif tool_name == "generate_pdf":
+            from backend.tools.docgen import generate_pdf
+
+            return generate_pdf(
+                content=arguments.get("content", ""),
+                title=arguments.get("title", "document"),
+                conversation_id=session_id,
+            )
+        elif tool_name == "generate_docx":
+            from backend.tools.docgen import generate_docx
+
+            return generate_docx(
+                content=arguments.get("content", ""),
+                title=arguments.get("title", "document"),
+                conversation_id=session_id,
+            )
+        elif tool_name == "analyze_image":
+            from backend.tools.vision import analyze_image
+
+            return analyze_image(
+                image_input=arguments.get("image_input", ""),
+                prompt=arguments.get("prompt", "Describe this image in detail."),
+            )
+        elif tool_name == "extract_structured":
+            from backend.tools.extraction import extract_structured
+
+            return extract_structured(
+                input_data=arguments.get("input_data", arguments.get("file_path", "")),
+                schema=arguments.get("schema", arguments.get("schema_definition", {})),
             )
         else:
             return {"error": f"Unknown tool: {tool_name}"}

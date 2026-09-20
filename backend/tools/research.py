@@ -102,14 +102,20 @@ def research_topic(
             f"# Research Report: {query.title()}",
             "",
             "## Executive Summary",
-            f"This report synthesizes findings on '{query}' based on {len(sources)} retrieved reference sources.",
+            f"This research document compiles verified information on **{query.title()}** based on {len(sources)} authoritative external sources.",
             "",
             "## Key Findings",
         ]
         for src in sources:
-            report_lines.append(f"- **{src['title']}**: {src['snippet'][:150]}...")
+            snippet = src["snippet"].strip()
+            if "Jump to content" in snippet:
+                snippet = snippet.split("Jump to content", 1)[-1].strip()
+            if "move to sidebar" in snippet:
+                snippet = snippet.split("hide", 1)[-1].strip()
+            report_lines.append(f"### {src['title']}")
+            report_lines.append(f"{snippet[:400]}...")
+            report_lines.append(f"🔗 *Source:* [{src['url']}]({src['url']})\n")
 
-        report_lines.append("")
         report_lines.append("## Citations and References")
         for i, src in enumerate(sources, 1):
             report_lines.append(f"{i}. [{src['title']}]({src['url']})")
