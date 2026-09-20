@@ -154,7 +154,7 @@ REQ-034,Interoperability - A2A,Agent exposed via A2A protocol,The agent advertis
 2. The A2A endpoint accepts tasks/send and tasks/get requests (JSON-RPC 2.0).
 3. Task lifecycle follows A2A spec: submitted → working → completed/failed.
 4. Streaming updates are available via SSE on the task endpoint.
-5. A2A server can be enabled/disabled via configuration.",P1 - Should Have,Phase 3,REQ-033,Not Started,,
+5. A2A server can be enabled/disabled via configuration.",P1 - Should Have,Phase 3,REQ-033,Complete,Antigravity Agent,2026-09-20
 REQ-035,Authentication,User registration and login via Authentik,"Users register and log in through Authentik (self-hosted OIDC/OAuth2 identity provider). Authentik handles email/password, password reset, and optional social logins (Google, GitHub). FastAPI validates Authentik-issued JWTs.","1. Authentik runs in Docker Compose.
 2. Provides login UI.
 3. FastAPI validates JWTs using PyJWT (not python-jose).
@@ -201,7 +201,7 @@ REQ-043,Tools - Extended,Sub-agent delegation,"The agent can spawn sub-agents fo
 2. Sub-agents run as separate conversations inheriting workspace context.
 3. Sub-agent results are returned to the parent agent as observations.
 4. Sub-agent traces are nested under the parent trace in Langfuse.
-5. Max concurrent sub-agents is configurable (default: 3).",P1 - Should Have,Phase 3,REQ-016; REQ-017; REQ-019,Not Started,,
+5. Max concurrent sub-agents is configurable (default: 3).",P1 - Should Have,Phase 3,REQ-016; REQ-017; REQ-019,Complete,Antigravity Agent,2026-09-20
 REQ-044,Tools - Extended,Extraction agent tools,"Agent can extract structured data from unstructured text, PDFs, and images into JSON or tabular format.","1. Tool: extract_structured with input (text/file path), schema (JSON schema), params.
 2. Extraction uses the LLM with structured output mode.
 3. Returns validated JSON conforming to the provided schema.
